@@ -27,7 +27,7 @@
 	</head>
 
 
-	<p>Parameters: <select id="wwindow">
+	<p>Parameters: <select id="parameters">
 	<option value="LeNC44.ppmi">LeNC44.ppmi-MDS</option>
 	<option value="LeNC44.L1LLR">LeNC44.L1LLR-MDS</option>
 	<option value="LeNC44.L1LLRx5">LeNC44.L1LLRx5-MDS</option>
@@ -153,7 +153,7 @@
 				});
 
 				function updateData() {
-						var selection = d3.select("#wwindow").property("value");
+						var selection = d3.select("#parameters").property("value");
 
 						//Update scale domains
 						xScale.domain([d3.min(dataset, function(d) { return +d[selection+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[selection+".x"]; }) * 1.1]);
@@ -177,10 +177,12 @@
 				   		})
 				   		.attr("cy", function(d) {
 				   			return yScale(d[selection+".y"]);
-				   		})
+				   		});
 //							.attr("r", 3)
-				   		.attr("r", function(d) {return getClustSize(+d[selection+".maxW"]*5);})
-				   		.attr("fill", function(d) {return getColors(d.label);})
+//				   		.attr("r", function(d) {return getClustSize(+d[selection+".maxW"]*5);})
+//				   		.attr("fill", function(d) {return getColors(d.label);})
+
+							svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d["LeNC44.ppmi.maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
 				}
 
 			function zoomed() {
