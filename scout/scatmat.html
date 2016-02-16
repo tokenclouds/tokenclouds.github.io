@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+svg {
+  font: 10px sans-serif;
+  padding: 10px;
+}
+
+.axis,
+.frame {
+  shape-rendering: crispEdges;
+}
+
+.axis line {
+  stroke: #ddd;
+}
+
+.axis path {
+  display: none;
+}
+
+.frame {
+  fill: none;
+  stroke: #aaa;
+}
+
+circle {
+  fill-opacity: .7;
+}
+
+circle.hidden {
+  fill: #ccc !important;
+}
+
+.extent {
+  fill: #000;
+  fill-opacity: .125;
+  stroke: #fff;
+}
+
+.tooltip {
+    position: absolute;
+    width: 300px;
+    height: 100px;
+    font-size: 12px;
+    pointer-events: none;
+}
+</style>
+<body>
+<p><label for="brush"><input type="checkbox" id="brush-enab">brush</label>
+<script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script>
+
+var width = 2420,
+    size = 375,
+    padding = 19.5;
+
+var x = d3.scale.linear()
+    .range([padding / 2, size - padding / 2]);
+
+var y = d3.scale.linear()
+    .range([size - padding / 2, padding / 2]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .ticks(5);
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .ticks(5);
+
+var color = d3.scale.category10();
+
+// add the tooltip area to the webpage
+var tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+d3.tsv("scout.tsv", function(error, data) {
+  var domainBySolution = {},
+      rownames = d3.keys(data[0]).filter(function(d) { return d.indexOf("LeNC") == 0; }),
+      xnames = rownames.filter(function (d) { return d[d.length-1] == "x" }),
+      solutions = []
+      xnames.forEach(function(xname) {
+	         //solutions.push(xname.substring(0, xname.length-2));
+           //solutions.reverse();
+           solutions = ["LeNC44.L1LLRx5", "LeNC44.L1LLR", "LeNC44.ppmi", "LeNC77.L1LLRx5", "LeNC77.L1LLR", "LeNC77.ppmi"]
+      }),
+//      n = solutions.length;
+// Define the size of the matrix
+      n = 3;
+
+      solutions.forEach(function(solution) {
+         domainBySolution[solution+".x"] = d3.extent(data, function(d) { return +d[solution+".x"]; });
+         domainBySolution[solution+".y"] = d3.extent(data, function(d) { return +d[solution+".y"]; });
+      });
+
+      xAxis.tickSize(size * n);
+      yAxis.tickSize(-size * n);
+
+      var brush = d3.svg.brush()
+          .x(x)
+          .y(y)
+          .on("brushstart", brushstart)
+          .on("brush", brushmove)
+          .on("brushend", brushend);
+
+      var svg = d3.select("body").append("svg")
+	     .attr("width", size * n + padding)
+	     .attr("height", size * n + padding)
+	     .append("g")
+	     .attr("transform", "translate(" + padding + "," + padding / 2 + ")");
+
+      svg.selectAll(".x.axis")
+	.data(solutions)
+	.enter().append("g")
+	.attr("class", "x axis")
+	.attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)"; })
+	.each(function(d) { x.domain(domainBySolution[d+".x"]); d3.select(this).call(xAxis); });
+
+      svg.selectAll(".y.axis")
+	.data(solutions)
+	.enter().append("g")
+	.attr("class", "y axis")
+	.attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
+	.each(function(d) { y.domain(domainBySolution[d+".y"]); d3.select(this).call(yAxis); });
+
+
+  var cell = svg.selectAll(".cell")
+      .data(combine(solutions))
+      .enter().append("g")
+      .attr("class", "cell")
+      .attr("transform", function(d) { return "translate(" + (n - +d.i - 1) * size + "," + +d.j * size + ")"; })
+      .each(plot);
+
+// Titles for all plots.
+  cell.append("text")
+    .attr("x", padding)
+    .attr("y", padding)
+    .attr("dy", ".71em")
+    .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }});
+
+    function clearBrush(){
+      d3.selectAll(".brush").remove();
+    }
+
+    var brushEnab = false;
+    d3.select("#brush-enab").on("change", function() {
+              brushEnab = this.checked;
+              if (brushEnab) {
+                cell.call(brush);
+              } else {
+                location.reload();
+              }
+            });
+
+  function plot(p) {
+    var cell = d3.select(this);
+    try {
+    x.domain(domainBySolution[p.x]);
+    y.domain(domainBySolution[p.y]);
+
+    cell.append("rect")
+        .attr("class", "frame")
+        .attr("x", padding / 2)
+        .attr("y", padding / 2)
+        .attr("width", size - padding)
+        .attr("height", size - padding);
+
+    cell.selectAll("circle")
+        .data(data)
+	      .enter().append("circle")
+        .attr("cx", function(d) { return x(d[p.x]); })
+        .attr("cy", function(d) { return y(d[p.y]); })
+        .attr("r", 5)
+        .style("fill", function(d) { return color(d.label); })
+        .attr("pointer-events", "all")
+        .on("click", function(d) {
+        tooltip.transition()
+        .duration(200)
+        .style("opacity", .9);
+        tooltip.html(d.text)
+        .style("right", "20px")
+        .style("top", "100px");
+      });
+      } catch (e) {
+        console.log("combinations missing")
+      }
+  }
+
+  var brushCell;
+
+  // Clear the previously-active brush, if any.
+  function brushstart(p) {
+    if (brushCell !== this) {
+      try {
+      d3.select(brushCell).call(brush.clear());
+      x.domain(domainBySolution[p.x]);
+      y.domain(domainBySolution[p.y]);
+      brushCell = this;
+    } catch (e) {
+      console.log("combinations missing")
+    }
+    }
+  }
+
+  // Highlight the selected circles.
+  function brushmove(p) {
+    var e = brush.extent();
+    svg.selectAll("circle").classed("hidden", function(d) {
+      return e[0][0] > d[p.x] || d[p.x] > e[1][0]
+          || e[0][1] > d[p.y] || d[p.y] > e[1][1];
+    });
+  }
+
+  // If the brush is empty, select all circles.
+  function brushend() {
+    if (brush.empty()) svg.selectAll(".hidden").classed("hidden", false);
+  }
+
+////
+////  function cross(a, b) {
+////    var c = [], n = a.length, m = b.length, i, j;
+////    for (i = -1; ++i < n;) for (j = -1; ++j < m;) c.push({x: a[i], i: i, y: b[j], j: j});
+////    return c;
+////  }
+////
+
+  function combine(s) {
+    var c = [], n = s.length, i, j, k = 0;
+    for (j = -1; ++j < n%4;) for (i = -1; ++i < 3;) if (k < n) c.push({x: s[k]+".x", i: i, y: s[k]+".y", j: j}), ++k;
+      return c;
+    }
+
+  d3.select(self.frameElement).style("height", size * n + padding + 20 + "px");
+ });
+
+</script>
