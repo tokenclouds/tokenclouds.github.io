@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Tokencloud parachute/noun</title>
+		<script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<style type="text/css">
+			.axis path,
+			.axis line {
+				fill: none;
+				stroke: black;
+				shape-rendering: crispEdges;
+			}
+
+			.axis text {
+				font-family: sans-serif;
+				font-size: 11px;
+			}
+
+			.tooltip {
+  				position: absolute;
+  				width: 200px;
+  				height: 28px;
+  				pointer-events: none;
+			}
+		</style>
+	</head>
+
+
+	<p>Parameters: <select id="parameters">
+	<option value="LeNC44.ppmi">LeNC44.ppmi-MDS</option>
+	<option value="LeNC44.L1LLR">LeNC44.L1LLR-MDS</option>
+	<option value="LeNC44.L1LLRx5">LeNC44.L1LLRx5-MDS</option>
+	<option value="LeNC77.ppmi">LeNC77.ppmi-MDS</option>
+	<option value="LeNC77.L1LLR">LeNC77.L1LLR-MDS</option>
+	<option value="LeNC77.L1LLRx5">LeNC77.L1LLRx5-MDS</option>
+
+	<body>
+		<script type="text/javascript">
+
+			//Width and height
+			var w = 600;
+			var h = 600;
+			var padding = 30;
+
+			// add the tooltip area to the webpage
+			var tooltip = d3.select("body").append("div")
+    			.attr("class", "tooltip")
+    			.style("opacity", 0);
+
+			var dataset;
+			d3.tsv("parachute.tsv", function(data) {
+			dataset = data;
+
+			//Create scale functions
+			var xScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }) * 1.1, d3.max(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }) * 1.1])
+								 //								 .domain(d3.extent(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }))
+								 .range([padding, w - padding * 2]);
+
+			var yScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d["LeNC44.ppmi.y"]; }) * 1.1, d3.max(dataset, function(d) { return +d["LeNC44.ppmi.y"]; }) * 1.1])
+								 .range([h - padding, padding]);
+
+			//Define X axis
+			var xAxis = d3.svg.axis()
+							  .scale(xScale)
+							  .orient("bottom")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Define Y axis
+			var yAxis = d3.svg.axis()
+							  .scale(yScale)
+							  .orient("left")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Zoom
+			var zoom = d3.behavior.zoom()
+						.scaleExtent([1, 10])
+						.on("zoom", zoomed);
+
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h)
+						.append("g")
+						.call(zoom);
+
+			var rect = svg.append("rect")
+						.attr("width", w)
+						.attr("height", h)
+						.style("fill", "none")
+						.style("pointer-events", "all");
+
+			var container = svg.append("g");
+
+			//Create color scale
+			var getColors = d3.scale.category10();
+
+			//Create dot size scale
+			var getClustSize = d3.scale.sqrt();
+
+			dot = container.append("g")
+			   .attr("class", "dot")
+			   .selectAll("circle")
+			   .data(dataset)
+			   .enter()
+			   .append("circle")
+			   .attr("cx", function(d) {
+			   		return xScale(+d["LeNC44.ppmi.x"]);
+			   })
+			   .attr("cy", function(d) {
+			   		return yScale(+d["LeNC44.ppmi.y"]);
+			   })
+			   .attr("r", function(d) {return getClustSize(+d["LeNC44.ppmi.maxW"]*5);})
+//				 .attr("r", 3)
+			   .style("fill", function(d) { return getColors(d.label); })
+      	 .on("mouseover", function(d) {
+          		tooltip.transition()
+								.duration(200)
+								.style("opacity", .9);
+          			tooltip.html("<b>"+d.token+"</b><br>"+d.text)
+								.style("left", (d3.event.pageX + 20) + "px")
+								.style("top", (d3.event.pageY - 28) + "px");
+			svg.selectAll("circle").style("opacity", .2);
+			d3.select(this).attr("r", function(d) {return getClustSize(+d["LeNC44.ppmi.maxW"]*5);}).style("fill", "red").style("opacity", 1);
+      		})
+      		.on("mouseout", function(d) {
+          		tooltip.transition()
+			.duration(500)
+			.style("opacity", 0);
+			svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d["LeNC44.ppmi.maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
+      		});
+
+			//Create X axis
+			container.append("g")
+				.attr("class", "x axis")
+				.attr("transform", "translate(0," + (h - padding) + ")")
+				.call(xAxis);
+
+			//Create Y axis
+			container.append("g")
+				.attr("class", "y axis")
+				.attr("transform", "translate(" + padding + ",0)")
+				.call(yAxis);
+
+				//On click, update with new data
+				d3.selectAll("select").on("change", function() {
+					updateData();
+				});
+
+				function updateData() {
+						var selection = d3.select("#parameters").property("value");
+
+						//Update scale domains
+						xScale.domain([d3.min(dataset, function(d) { return +d[selection+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[selection+".x"]; }) * 1.1]);
+						yScale.domain([d3.min(dataset, function(d) { return +d[selection+".y"]; }) * 1.1, d3.max(dataset, function(d) { return +d[selection+".y"]; }) * 1.1]);
+
+						svg.select("g.x.axis")
+							.call(xAxis);
+
+						svg.select("g.y.axis")
+							.call(yAxis);
+
+						svg.select("#tooltip").classed("hidden", true);
+
+						//Update all circles
+						svg.selectAll("circle")
+						   .data(dataset)
+						   .transition()
+	   					 .duration(1000)
+						   .attr("cx", function(d) {
+				   			return xScale(d[selection+".x"]);
+				   		})
+				   		.attr("cy", function(d) {
+				   			return yScale(d[selection+".y"]);
+				   		});
+//							.attr("r", 3)
+//				   		.attr("r", function(d) {return getClustSize(+d[selection+".maxW"]*5);})
+//				   		.attr("fill", function(d) {return getColors(d.label);})
+
+							svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d["LeNC44.ppmi.maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
+				}
+
+			function zoomed() {
+				container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+			}
+			});
+		</script>
+	</body>
+</html>
