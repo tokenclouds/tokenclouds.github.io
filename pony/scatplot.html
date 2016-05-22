@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Tokencloud koper/noun</title>
+		<script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<style type="text/css">
+			.axis path,
+			.axis line {
+				fill: none;
+				stroke: black;
+				shape-rendering: crispEdges;
+			}
+
+			.axis text {
+				font-family: sans-serif;
+				font-size: 11px;
+			}
+
+			.tooltip {
+  				position: absolute;
+  				width: 200px;
+  				height: 28px;
+  				pointer-events: none;
+			}
+
+			circle {
+			  fill-opacity: .7;
+			}
+
+			circle.hidden {
+			  fill: #ccc !important;
+			}
+		</style>
+		<script>
+			var loc = window.location.pathname;
+			var dir = loc.substring(1, loc.lastIndexOf('/'));
+			var pos = '/noun'
+			document.title = dir + pos + " tokencloud";
+		</script>
+	</head>
+	<script>document.write('<h2>' + dir + pos + '</h2>');</script>
+	<p><label id="lup"><u>matrix</u></label>
+	<p>
+	Parameters: <select id="parameters">
+	<option value="LeNC44.ppmi">LeNC44.ppmi-MDS</option>
+	<option value="LeNC44.L1LLR">LeNC44.L1LLR-MDS</option>
+	<option value="LeNC44.L1LLRx5">LeNC44.L1LLRx5-MDS</option>
+	<option value="LeNC77.ppmi">LeNC77.ppmi-MDS</option>
+	<option value="LeNC77.L1LLR">LeNC77.L1LLR-MDS</option>
+	<option value="LeNC77.L1LLRx5">LeNC77.L1LLRx5-MDS</option></select>
+
+	&nbsp;<label id="clear-select"><button>Clear selection</button></label>
+
+	<body>
+		<script type="text/javascript">
+			//Width and height
+			var w = 600;
+			var h = 600;
+			var padding = 30;
+
+			// add the tooltip area to the webpage
+			var tooltip = d3.select("body").append("div")
+    			.attr("class", "tooltip")
+    			.style("opacity", 0);
+
+			var dataset;
+
+			// if (localStorage.getItem("selection") == null) {
+			// 	var selection = [];
+			// } else {
+			// 	var selection = JSON.parse(localStorage.getItem("selection"));
+			// }
+
+			var selection = (localStorage.getItem("selection") == null) ? [] : JSON.parse(localStorage.getItem("selection"));
+			var goToPlot = (localStorage.getItem("goToPlot") == null) ? "LeNC44.ppmi" : localStorage.getItem("goToPlot");
+
+			d3.tsv(dir + ".tsv", function(data) {
+			dataset = data;
+
+			//Create scale functions
+			var xScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d[goToPlot+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[goToPlot+".x"]; }) * 1.1])
+								 //								 .domain(d3.extent(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }))
+								 .range([padding, w - padding * 2]);
+
+			var yScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d[goToPlot+".y"]; }) * 1.1, d3.max(dataset, function(d) { return +d[goToPlot+".y"]; }) * 1.1])
+								 .range([h - padding, padding]);
+
+			//Define X axis
+			var xAxis = d3.svg.axis()
+							  .scale(xScale)
+							  .orient("bottom")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Define Y axis
+			var yAxis = d3.svg.axis()
+							  .scale(yScale)
+							  .orient("left")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Zoom
+			var zoom = d3.behavior.zoom()
+						.scaleExtent([1, 10])
+						.on("zoom", zoomed);
+
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h)
+						.append("g")
+						.call(zoom);
+
+			var rect = svg.append("rect")
+						.attr("width", w)
+						.attr("height", h)
+						.style("fill", "none")
+						.style("pointer-events", "all");
+
+			var container = svg.append("g");
+
+			//Create color scale
+			var getColors = d3.scale.category10();
+
+			//Create dot size scale
+			var getClustSize = d3.scale.sqrt();
+
+			dot = container.append("g")
+			   .attr("class", "dot")
+			   .selectAll("circle")
+			   .data(dataset)
+			   .enter()
+			   .append("circle")
+			   .attr("cx", function(d) {
+			   		return xScale(+d[goToPlot+".x"]);
+			   })
+			   .attr("cy", function(d) {
+			   		return yScale(+d[goToPlot+".y"]);
+			   })
+			   .attr("r", function(d) {return getClustSize(+d[goToPlot+".maxW"]*5);})
+//				 .attr("r", 3)
+			   .style("fill", function(d) { return getColors(d.label); })
+				 .classed("hidden", function(d) {
+					   if (selection.length > 0) {
+						 	return !(selection.indexOf(d.token) > -1);
+						}
+				 })
+      	 .on("mouseover", function(d) {
+          		tooltip.transition()
+								.duration(200)
+								.style("opacity", .9);
+          			tooltip.html("<b>"+d.token+"</b><br>"+d.text)
+								.style("left", (d3.event.pageX + 20) + "px")
+								.style("top", (d3.event.pageY - 28) + "px");
+								svg.selectAll("circle").style("opacity", .2);
+								d3.select(this).attr("r", function(d) {return getClustSize(+d[goToPlot+".maxW"]*5);}).style("opacity", 1).classed("hidden", false);
+      		})
+      		.on("mouseout", function(d) {
+          		tooltip.transition()
+								.duration(500)
+								.style("opacity", 0);
+								if (selection.length > 0) {
+									d3.select(this).classed("hidden", function(d) {
+										return (selection.indexOf(d.token) === -1);
+									});
+								}
+								svg.selectAll("circle").style("opacity", 1);
+      		})
+					.on("click", function(d) {
+							if (selection.indexOf(d.token) === -1) {
+								selection.push(d.token);
+							} else {
+								var index = selection.indexOf(d.token);
+								if (index > -1) {
+									selection.splice(index, 1);
+								}
+							}
+							if (selection.length > 0) {
+								svg.selectAll("circle").classed("hidden", function(d) {
+									return !(selection.indexOf(d.token) > -1);
+								})
+							}
+							localStorage.setItem("selection", JSON.stringify(selection));
+					});
+
+			//Create X axis
+			container.append("g")
+				.attr("class", "x axis")
+				.attr("transform", "translate(0," + (h - padding) + ")")
+				.call(xAxis);
+
+			//Create Y axis
+			container.append("g")
+				.attr("class", "y axis")
+				.attr("transform", "translate(" + padding + ",0)")
+				.call(yAxis);
+
+				//On click, update with new data
+				d3.selectAll("select").on("change", function() {
+					updateData();
+				});
+
+				d3.select("#clear-select").on("click", function() {
+					selection = []
+					localStorage.setItem("selection", JSON.stringify(selection));
+					svg.selectAll(".hidden").classed("hidden", false);
+				});
+
+				d3.select("#lup").on("click", function() {
+					window.location = "scatmat.html";
+				});
+
+				function updateData() {
+						var pset = d3.select("#parameters").property("value");
+
+						//Update scale domains
+						xScale.domain([d3.min(dataset, function(d) { return +d[pset+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[pset+".x"]; }) * 1.1]);
+						yScale.domain([d3.min(dataset, function(d) { return +d[pset+".y"]; }) * 1.1, d3.max(dataset, function(d) { return +d[pset+".y"]; }) * 1.1]);
+
+						svg.select("g.x.axis")
+							.call(xAxis);
+
+						svg.select("g.y.axis")
+							.call(yAxis);
+
+						svg.select("#tooltip").classed("hidden", true);
+
+						//Update all circles
+						svg.selectAll("circle")
+						   .data(dataset)
+						   .transition()
+	   					 .duration(1000)
+						   .attr("cx", function(d) {
+				   			return xScale(d[pset+".x"]);
+				   		})
+				   		.attr("cy", function(d) {
+				   			return yScale(d[pset+".y"]);
+				   		});
+//							.attr("r", 3)
+//				   		.attr("r", function(d) {return getClustSize(+d[selection+".maxW"]*5);})
+//				   		.attr("fill", function(d) {return getColors(d.label);})
+
+							svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d[pset+".maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
+				}
+
+			function zoomed() {
+				container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+			}
+			});
+		</script>
+	</body>
+</html>
