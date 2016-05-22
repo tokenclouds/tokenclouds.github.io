@@ -47,8 +47,18 @@ circle.hidden {
     pointer-events: none;
 }
 </style>
+<head>
+  <script>
+  var loc = window.location.pathname;
+  var dir = loc.substring(1, loc.lastIndexOf('/'));
+  var pos = '/noun'
+  document.title = dir + pos + " scatterplot matrix";
+  </script>
+</head>
 <body>
-<p><label for="brush"><input type="checkbox" id="brush-enab">brush</label>
+<script>document.write('<h2>' + dir + pos + '</h2>');</script>
+<p><label id="ldown"><u>tokencloud</u></label><br>
+  Selection options:<br> <label for="brush"><input type="checkbox" id="brush-enab">brush</label><label for="click"><input type="checkbox" id="click-select">select</label>&nbsp;<label id="clear-select"><button>Clear selection</button></label>
 <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <script>
 
@@ -79,7 +89,11 @@ var tooltip = d3.select("body").append("div")
     .attr("class", "tooltip")
     .style("opacity", 0);
 
-d3.tsv("match.tsv", function(error, data) {
+var brushCell;
+
+var selection = (localStorage.getItem("selection") == null) ? [] : JSON.parse(localStorage.getItem("selection"));
+
+d3.tsv(dir + ".tsv", function(error, data) {
   var domainBySolution = {},
       rownames = d3.keys(data[0]).filter(function(d) { return d.indexOf("LeNC") == 0; }),
       xnames = rownames.filter(function (d) { return d[d.length-1] == "x" }),
@@ -89,7 +103,7 @@ d3.tsv("match.tsv", function(error, data) {
            //solutions.reverse();
            solutions = ["LeNC44.L1LLRx5", "LeNC44.L1LLR", "LeNC44.ppmi", "LeNC77.L1LLRx5", "LeNC77.L1LLR", "LeNC77.ppmi"]
       }),
-//      n = solutions.length;
+
 // Define the size of the matrix
       n = 3;
 
@@ -115,18 +129,18 @@ d3.tsv("match.tsv", function(error, data) {
 	     .attr("transform", "translate(" + padding + "," + padding / 2 + ")");
 
       svg.selectAll(".x.axis")
-	.data(solutions)
-	.enter().append("g")
-	.attr("class", "x axis")
-	.attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)"; })
-	.each(function(d) { x.domain(domainBySolution[d+".x"]); d3.select(this).call(xAxis); });
+      .data(solutions)
+      .enter().append("g")
+      .attr("class", "x axis")
+      .attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)"; })
+      .each(function(d) { x.domain(domainBySolution[d+".x"]); d3.select(this).call(xAxis); });
 
       svg.selectAll(".y.axis")
-	.data(solutions)
-	.enter().append("g")
-	.attr("class", "y axis")
-	.attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
-	.each(function(d) { y.domain(domainBySolution[d+".y"]); d3.select(this).call(yAxis); });
+      .data(solutions)
+      .enter().append("g")
+      .attr("class", "y axis")
+      .attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
+      .each(function(d) { y.domain(domainBySolution[d+".y"]); d3.select(this).call(yAxis); });
 
 
   var cell = svg.selectAll(".cell")
@@ -141,21 +155,47 @@ d3.tsv("match.tsv", function(error, data) {
     .attr("x", padding)
     .attr("y", padding)
     .attr("dy", ".71em")
-    .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }});
+    .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }})
+//    .on('click', function(d) {console.log(d.x.substring(0, d.x.length-2));});
+    .on('click', function(d) {
+      localStorage.setItem("goToPlot", d.x.substring(0, d.x.length-2));
+      window.location = "scatplot.html";
+    });
 
     function clearBrush(){
-      d3.selectAll(".brush").remove();
+      cell.selectAll('.brush').remove();
     }
 
     var brushEnab = false;
     d3.select("#brush-enab").on("change", function() {
               brushEnab = this.checked;
               if (brushEnab) {
-                cell.call(brush);
+                cell.append("g")
+                  .attr("class", "brush")
+                  .call(brush);
               } else {
-                location.reload();
+//                location.reload();
+                clearBrush();
               }
             });
+
+  var clickSelect = false;
+  d3.select("#click-select").on("change", function() {
+    clickSelect = this.checked;
+  });
+
+  d3.select("#clear-select").on("click", function() {
+    clearBrush();
+    selection = []
+    localStorage.setItem("selection", JSON.stringify(selection));
+    svg.selectAll(".hidden").classed("hidden", false);
+    d3.selectAll('input').property('checked', false);
+    clickSelect = false;
+  });
+
+  d3.select("#ldown").on("click", function() {
+    window.location = "scatplot.html";
+  });
 
   function plot(p) {
     var cell = d3.select(this);
@@ -177,21 +217,37 @@ d3.tsv("match.tsv", function(error, data) {
         .attr("cy", function(d) { return y(d[p.y]); })
         .attr("r", 5)
         .style("fill", function(d) { return color(d.label); })
+        .classed("hidden", function(d) {
+            if (selection.length > 0) {
+             return !(selection.indexOf(d.token) > -1);
+           }
+        })
         .attr("pointer-events", "all")
+//        .on("click", scatterplot(p));
         .on("click", function(d) {
-        tooltip.transition()
-        .duration(200)
-        .style("opacity", .9);
-        tooltip.html(d.text)
-        .style("right", "20px")
-        .style("top", "100px");
-      });
+          if (clickSelect) {
+            if (selection.indexOf(d.token) === -1) {
+                selection.push(d.token);
+                console.log("push " + d.token);
+          } else {
+                var index = selection.indexOf(d.token);
+                if (index > -1) {
+                  selection.splice(index, 1);
+                }
+                console.log("splice " + d.token);
+          }
+            if (selection.length > 0) {
+                svg.selectAll("circle").classed("hidden", function(d) {
+                    return !(selection.indexOf(d.token) > -1);
+            })
+          }
+            localStorage.setItem("selection", JSON.stringify(selection));
+          }
+          })
       } catch (e) {
         console.log("combinations missing")
       }
   }
-
-  var brushCell;
 
   // Clear the previously-active brush, if any.
   function brushstart(p) {
@@ -210,6 +266,7 @@ d3.tsv("match.tsv", function(error, data) {
   // Highlight the selected circles.
   function brushmove(p) {
     var e = brush.extent();
+//    console.log(e);
     svg.selectAll("circle").classed("hidden", function(d) {
       return e[0][0] > d[p.x] || d[p.x] > e[1][0]
           || e[0][1] > d[p.y] || d[p.y] > e[1][1];
@@ -218,16 +275,20 @@ d3.tsv("match.tsv", function(error, data) {
 
   // If the brush is empty, select all circles.
   function brushend() {
-    if (brush.empty()) svg.selectAll(".hidden").classed("hidden", false);
+    if (brush.empty()) {
+      svg.selectAll(".hidden").classed("hidden", false);
+    } else {
+      selection = [];
+      svg.selectAll("circle").each(function(d) {
+        if (!(d3.select(this).classed("hidden"))) {
+          if (selection.indexOf(d.token) === -1) {
+              selection.push(d.token);
+            }
+          }
+      });
+      localStorage.setItem("selection", JSON.stringify(selection));
+    }
   }
-
-////
-////  function cross(a, b) {
-////    var c = [], n = a.length, m = b.length, i, j;
-////    for (i = -1; ++i < n;) for (j = -1; ++j < m;) c.push({x: a[i], i: i, y: b[j], j: j});
-////    return c;
-////  }
-////
 
   function combine(s) {
     var c = [], n = s.length, i, j, k = 0;
@@ -235,7 +296,154 @@ d3.tsv("match.tsv", function(error, data) {
       return c;
     }
 
+// d3.select('button').on('click', function() {
+  function scatplot(whatever) {
+    d3.select("svg").remove();
+    d3.select("div").remove();
+
+    // add the tooltip area to the webpage
+    var tooltip = d3.select("body").append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0);
+
+    var dataset;
+    d3.tsv("koper.tsv", function(data) {
+    dataset = data;
+
+    //Width and height
+    var width = 600;
+    var height = 600;
+    var padding = 30;
+
+    //Create scale functions
+    var xScale = d3.scale.linear()
+               .domain([d3.min(dataset, function(d) { return +d[whatever+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[whatever+".x"]; }) * 1.1])
+               //								 .domain(d3.extent(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }))
+               .range([padding, width - padding * 2]);
+
+    var yScale = d3.scale.linear()
+               .domain([d3.min(dataset, function(d) { return +d[whatever+".y"]; }) * 1.1, d3.max(dataset, function(d) { return +d[whatever+".y"]; }) * 1.1])
+               .range([height - padding, padding]);
+
+    //Define X axis
+    var xAxis = d3.svg.axis()
+              .scale(xScale)
+              .orient("bottom")
+              .ticks(10)
+              .outerTickSize(0);
+
+    //Define Y axis
+    var yAxis = d3.svg.axis()
+              .scale(yScale)
+              .orient("left")
+              .ticks(10)
+              .outerTickSize(0);
+
+    //Zoom
+    var zoom = d3.behavior.zoom()
+          .scaleExtent([1, 10])
+          .on("zoom", zoomed);
+
+    //Create SVG element
+    var svg = d3.select("body")
+          .append("svg")
+          .attr("width", width)
+          .attr("height", height)
+          .append("g")
+          .call(zoom);
+
+    var rect = svg.append("rect")
+          .attr("width", width)
+          .attr("height", height)
+          .style("fill", "none")
+          .style("pointer-events", "all");
+
+    var container = svg.append("g");
+
+    //Create color scale
+    var getColors = d3.scale.category10();
+
+    //Create dot size scale
+    var getClustSize = d3.scale.sqrt();
+
+    var brush = d3.svg.brush()
+        .x(xScale)
+        .y(yScale)
+        .on("brush", brushmove)
+        .on("brushend", brushend);
+
+    dot = container.append("g")
+       .attr("class", "dot")
+       .selectAll("circle")
+       .data(dataset)
+       .enter()
+       .append("circle")
+       .attr("cx", function(d) {
+          return xScale(+d[whatever+".x"]);
+       })
+       .attr("cy", function(d) {
+          return yScale(+d[whatever+".y"]);
+       })
+       .attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);})
+//				 .attr("r", 3)
+       .style("fill", function(d) { return getColors(d.label); })
+       .on("mouseover", function(d) {
+            tooltip.transition()
+              .duration(200)
+              .style("opacity", .9);
+              tooltip.html("<b>"+d.token+"</b><br>"+d.text)
+              .style("left", (d3.event.pageX + 20) + "px")
+              .style("top", (d3.event.pageY - 28) + "px");
+    svg.selectAll("circle").style("opacity", .2);
+    d3.select(this).attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);}).style("fill", "red").style("opacity", 1);
+        })
+        .on("mouseout", function(d) {
+            tooltip.transition()
+              .duration(500)
+              .style("opacity", 0);
+        svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
+        });
+
+    //Create X axis
+    container.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + (height - padding) + ")")
+      .call(xAxis);
+
+    //Create Y axis
+    container.append("g")
+      .attr("class", "y axis")
+      .attr("transform", "translate(" + padding + ",0)")
+      .call(yAxis);
+
+    function zoomed() {
+      container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    }
+
+//    container.append("g")
+//        .attr("class", "brush")
+//        .call(brush);
+
+    // Restore the previous brush selection
+    svg.selectAll("circle").classed("hidden", function(d) {
+      return e[0][0] > +d[whatever+".x"] || +d[whatever+".x"] > e[1][0]
+      || e[0][1] > +d[whatever+".y"] || +d[whatever+".y"] > e[1][1];
+    });
+
+    // Highlight the selected circles.
+    function brushmove() {}
+
+    // If the brush is empty, select all circles.
+    function brushend() {
+      if (brush.empty()) svg.selectAll(".hidden").classed("hidden", false);
+    }
+
+
+    });
+  }
+
   d3.select(self.frameElement).style("height", size * n + padding + 20 + "px");
- });
+
+});
 
 </script>
