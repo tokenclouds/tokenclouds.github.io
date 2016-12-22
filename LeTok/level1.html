@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Model selection</title>
+		<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<script src="d3.legend.js"></script>
+		<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+		<style type="text/css">
+			.axis path,
+			.axis line {
+				fill: none;
+				stroke: black;
+				shape-rendering: crispEdges;
+			}
+
+			.axis text {
+				font-family: sans-serif;
+				font-size: 11px;
+			}
+
+			.tooltip {
+  				position: absolute;
+  				width: 200px;
+  				height: 28px;
+  				pointer-events: none;
+			}
+
+			path {
+			  fill-opacity: .8;
+			}
+
+			path.selected {
+			  fill-opacity: .2;
+			}
+
+			#wrap{
+				border: 1px solid white;
+				width: 600px;
+			}
+
+			div {
+    		float: left;
+			}
+
+			.legend rect {
+  			fill:white;
+  			stroke:black;
+  			opacity:0.8;}
+
+		</style>
+	</head>
+
+	<div id="wrap">
+		<div><button type="button" class="btn btn-default" id="clear-select">Clear selection</button></div>
+		<div><button type="button" class="btn btn-default" id="confirm-select">Confirm selection</button></div>
+
+		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select colour<span class="caret"></span></button>
+			<ul class="dropdown-menu" id="colour"></ul>
+		</div>
+		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select shape<span class="caret"></span></button>
+			<ul class="dropdown-menu" id="shape"></ul>
+		</div>
+		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select size<span class="caret"></span></button>
+			<ul class="dropdown-menu" id="size"></ul>
+		</div>
+	</div>
+	<br>
+
+	<div class="container">
+		<h2></h2>
+		<p></p>
+	</div>
+
+	<body>
+		<script type="text/javascript">
+			//Width and height
+			var w = 600;
+			var h = 600;
+			var padding = 30;
+
+			// add the tooltip area to the webpage
+			var tooltip = d3.select("body").append("div")
+    			.attr("class", "tooltip")
+    			.style("opacity", 0);
+
+			var dataset;
+			var firstRow;
+
+			var cset;
+			var sset;
+			var shset;
+
+			var selection = (localStorage.getItem("modselection") == null) ? [] : JSON.parse(localStorage.getItem("modselection"));
+
+			d3.tsv("kopermodels.tsv", function(error, data) {
+				dataset = data;
+
+			// Extracts the first token name, assumes this is the type and sets it as the page title
+			//var type = data[1]["_id"].match(/\w+/)
+			var type = "koper"
+			document.title = "Level 1: " + type + " tokencloud models";
+			d3.select("body").select("h2").text("Level 1: " + type);
+			d3.select("body").select("p").append("a").attr("href", "level2.html").text("down");
+//			d3.select("body").select("p").append("p").text("isoMDS stress: " + data[0]["stress"]).style("font-size", "10px");
+
+			colnames = d3.keys(data[0]);
+			// Takes the first columns that end with ".x" and ".y"
+			xcol = colnames.filter(function(d) { return d.endsWith(".x"); })[0];
+			ycol = colnames.filter(function(d) { return d.endsWith(".y"); })[0];
+			othercols = colnames.filter(function(d) {return (!d.endsWith(".x") && !d.endsWith(".y"))});
+			firstRow = d3.entries(dataset[1]).filter(function(d) { if (othercols.indexOf(d.key) >= 0) {return d.value;}; });
+			models = d3.entries(dataset).filter(function (d) {return d["_id"]});
+			console.log(models);
+
+		  // function isNumber(obj) { return !isNaN(parseFloat(obj)) }
+			//
+			// nominals = firstRow.filter(function(d) { if (!isNumber(d.value)) { return d.key; } });
+			// numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
+			colours = ["wWindow", "wScheme"];
+			size = ["windowSize", "MDSstress"];
+
+			// Create selection menu for colour-coding
+			var colourDropDown = d3.select("#colour")
+									.attr("name", "Colour")
+									.selectAll("option")
+									.data(colours)
+									.enter()
+									.append("li")
+									.append("a")
+									.attr("class", "col")
+									.attr("xlink:href", "#")
+									.attr("value", function (d) { return d; })
+									.text(function (d) { return d; });
+
+			var shapeDropDown = d3.select("#shape")
+									.attr("name", "Shape")
+									.selectAll("option")
+									.data(colours)
+									.enter()
+									.append("li")
+									.append("a")
+									.attr("class", "shape")
+									.attr("xlink:href", "#")
+									.attr("value", function (d) { return d; })
+									.text(function (d) { return d; });
+
+			var sizeDropDown = d3.select("#size")
+									.attr("name", "Size")
+									.selectAll("option")
+									.data(size)
+									.enter()
+									.append("li")
+									.append("a")
+									.attr("class", "siz")
+									.attr("xlink:href", "#")
+									.attr("value", function (d) { return d; })
+									.text(function (d) { return d; });
+			//Create random coordinates
+			// var randomCor = [];
+			// for (var i = 0; i < models.length; i++) {
+    	// 		var newX = Math.random() * 30;
+			// 		var newY = Math.random() * 30;
+			// 		var newObject = {x:newX, y:newY, name:models[i].substring(0, models[i].length-2), wWindow:models[i].substring(0, 6), wScheme:models[i].substring(7, models[i].length)}
+			// 		randomCor.push(newObject);
+			// }
+			// console.log(randomCor);
+
+			//Create scale functions
+			var xScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d[xcol]; }) * 1.1, d3.max(dataset, function(d) { return +d[xcol]; }) * 1.1])
+								 .range([padding, w - padding * 2]);
+
+			var yScale = d3.scale.linear()
+								 .domain([d3.min(dataset, function(d) { return +d[ycol]; }) * 1.1, d3.max(dataset, function(d) { return +d[ycol]; }) * 1.1])
+								 .range([h - padding, padding]);
+
+			//Define X axis
+			var xAxis = d3.svg.axis()
+							  .scale(xScale)
+							  .orient("bottom")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Define Y axis
+			var yAxis = d3.svg.axis()
+							  .scale(yScale)
+							  .orient("left")
+							  .ticks(10)
+							  .outerTickSize(0);
+
+			//Zoom
+			var zoom = d3.behavior.zoom()
+						.scaleExtent([1, 10])
+						.on("zoom", zoomed);
+
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h)
+						.append("g")
+						.call(zoom);
+
+			var rect = svg.append("rect")
+						.attr("width", w)
+						.attr("height", h)
+						.style("fill", "none")
+						.style("pointer-events", "all");
+
+			var container = svg.append("g");
+
+			//Create color scale
+			var getColors = d3.scale.category10();
+
+			//Create dot size scale
+			var getClustSize = d3.scale.sqrt();
+
+			//Create shape scale
+			var getShape = d3.scale.ordinal().range(["cross", "diamond", "square", "triangle-down", "triangle-up"]);
+
+			dot = container.append("g")
+				.attr("class", "dot")
+				.selectAll("path")
+				.data(dataset, function(d) { return d["_id"]; })
+				.enter()
+				.append("path")
+				.attr("transform", function(d) { return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")"; })
+				.attr("d", d3.svg.symbol().type("circle"))
+			//    .attr("cx", function(d) {
+			//    		return xScale(+d[xcol]);
+			//    })
+			//    .attr("cy", function(d) {
+			//    		return yScale(+d[ycol]);
+			//    })
+			// 	 .attr("r", 5)
+				.style("fill", getColors("dummy"))
+				.classed("selected", function(d) {
+					if (selection.length > 0) {
+						return !(selection.indexOf(d["_id"]) > -1);
+					}
+				 })
+				 .attr("data-legend", " ")
+      	 .on("mouseover", function(d) {
+          		tooltip.transition()
+					.duration(200)
+					.style("opacity", .9);
+          		tooltip.html("<b>" + d["_id"] + "</b>" + (typeof sset  !== "undefined" ? "<p><b>"+sset+"</b>: " + d[sset] : "" ))
+					.style("left", (d3.event.pageX + 20) + "px")
+					.style("top", (d3.event.pageY - 28) + "px");
+//				svg.select(".dot").selectAll("circle").style("opacity", .2);
+//				d3.select(this).style("opacity", 1).classed("selected", false);
+				svg.select(".dot")
+					.append("path")
+					.classed("selector", true)
+					.attr("transform", d3.select(this).attr("transform"))
+					.attr("d", d3.svg.symbol().type("circle").size(this.getTotalLength()+200))
+					.attr("fill", "none")
+					.attr("stroke", "red")
+					.attr("stroke-width", 3);
+      		})
+      		.on("mouseout", function(d) {
+          		tooltip.transition()
+					.duration(500)
+					.style("opacity", 0);
+				if (selection.length > 0) {
+					d3.select(this).classed("selected", function(d) {
+						return (selection.indexOf(d["_id"]) === -1);
+					});
+				}
+//				svg.select(".dot").selectAll("circle").style("opacity", 1);
+				svg.selectAll(".selector").remove();
+      		})
+					// .on('click', function(d) {
+					// 	localStorage.setItem("goToPlot", d["_id"].substring(0, d["_id"].length-2));
+					// 	window.location = "level2.html";
+					// });
+					.on("click", function(d) {
+							if (selection.indexOf(d["_id"]) === -1) {
+								selection.push(d["_id"]);
+							} else {
+								var index = selection.indexOf(d["_id"]);
+								if (index > -1) {
+									selection.splice(index, 1);
+								}
+							}
+							if (selection.length > 0) {
+								svg.select(".dot").selectAll("path:not(.selector)").classed("selected", function(d) {
+									return !(selection.indexOf(d["_id"]) > -1);
+								})
+							}
+							localStorage.setItem("modselection", JSON.stringify(selection));
+					});
+
+			//Create X axis
+			container.append("g")
+				.attr("class", "x axis")
+				.attr("transform", "translate(0," + (h - padding) + ")")
+				.call(xAxis);
+
+			//Create Y axis
+			container.append("g")
+				.attr("class", "y axis")
+				.attr("transform", "translate(" + padding + ",0)")
+				.call(yAxis);
+
+ 				//On menu change, update colour and/or size
+				d3.selectAll(".col").on("click", function() {
+					cset = this.getAttribute("value");
+					updateData("colour");
+				});
+
+				d3.selectAll(".shape").on("click", function() {
+					shset = this.getAttribute("value");
+//					localStorage.setItem("shset", JSON.stringify(shset));
+					updateData("shape");
+				});
+
+				d3.selectAll(".siz").on("click", function() {
+					sset = this.getAttribute("value");
+					updateData("size");
+				});
+
+ 				d3.select("#clear-select").on("click", function() {
+ 					selection = []
+ 					localStorage.setItem("modselection", JSON.stringify(selection));
+ 					svg.selectAll(".selected").classed("selected", false);
+ 				});
+
+				d3.select("#confirm-select").on("click", function() {
+					localStorage.setItem("goToPlot", JSON.parse(localStorage.getItem("modselection"))[0].substring(0, JSON.parse(localStorage.getItem("modselection"))[0].length-2));
+					window.location = "level2.html";
+ 				});
+
+				function updateData(feature) {
+				// 		//Update scale domains
+				// 		xScale.domain([d3.min(dataset, function(d) { return +d[xcol]; }) * 1.1, d3.max(dataset, function(d) { return +d[xcol]; }) * 1.1]);
+				// 		yScale.domain([d3.min(dataset, function(d) { return +d[ycol]; }) * 1.1, d3.max(dataset, function(d) { return +d[ycol]; }) * 1.1]);
+				//
+				// 		//Update axis
+				// 		svg.select("g.x.axis")
+				// 			.call(xAxis);
+				//
+				// 		svg.select("g.y.axis")
+				// 			.call(yAxis);
+				//
+				// 		//Hide tooltip
+				// 		svg.select("#tooltip").classed("hidden", true);
+				//
+						//Update all circles
+						svg.selectAll("path")
+						   .data(data)
+						   .transition()
+	   					   .duration(1000)
+						  //  .attr("cx", function(d) {
+							// 			return xScale(d[xcol]);
+							// 		})
+							// 		.attr("cy", function(d) {
+							// 			return yScale(d[ycol]);
+							// 		})
+							// .attr("data-legend", function(d) { return d[cset]});
+
+				// Refresh the scales
+				getColors = d3.scale.category10();
+				getClustSize = d3.scale.sqrt();
+				getShape = d3.scale.ordinal().range(["circle", "cross", "diamond", "square", "triangle-down", "triangle-up"]);
+				if (typeof sset !== "undefined" && typeof cset !== "undefined" && typeof shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
+					console.log("sset, shset and cset are not undefined")
+				} else if (typeof cset !== "undefined" && typeof sset == "undefined" && typeof shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", function(d) { return getColors(d[cset]); });
+				} else if (typeof cset !== "undefined" && typeof sset !== "undefined" && shset == "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
+				} else if (typeof cset == "undefined" && typeof sset !== "undefined" && shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
+				} else if (typeof sset  !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
+					console.log("sset is not undefined");
+				} else if (typeof cset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", function(d) { return getColors(d[cset]); });
+					console.log("cset is not undefined");
+				} else if (typeof shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", "#1f77b4");
+					console.log("shset is not undefined");
+				}
+
+				svg.selectAll("path").attr("data-legend", function(d) {
+					if (feature == "colour") {
+						return d[cset];
+					} else if (feature == "shape") {
+						return d[shset];
+					}
+				});
+				
+				//Update legend or append if not created yet after necessary (!) delay
+				if (typeof cset !== "undefined") {
+					setTimeout(function() {
+						if (typeof legend !== "undefined") {
+							legend.call(d3.legend)
+						} else {
+							legend = container.append("g")
+								.attr("class","legend")
+								.attr("transform","translate(500,30)")
+								.style("font-size","12px")
+								.call(d3.legend)
+						}
+					},100)
+				}
+			}
+
+			function zoomed() {
+				container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+			}
+
+			});
+		</script>
+	</body>
+</html>

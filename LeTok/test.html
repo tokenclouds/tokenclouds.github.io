@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+    <meta charset="utf-8">
+    <title>Scatterplot matrix</title>
+    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="d3.legend.js"></script>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <style type="text/css">
+svg {
+  font: 10px sans-serif;
+  padding: 10px;
+}
+
+.axis,
+.frame {
+  shape-rendering: crispEdges;
+}
+
+.axis line {
+  stroke: #ddd;
+}
+
+.axis path {
+  display: none;
+}
+
+.frame {
+  fill: none;
+  stroke: #aaa;
+}
+
+circle {
+  fill-opacity: .7;
+}
+
+circle.selected {
+  fill: #ccc !important;
+}
+
+.extent {
+  fill: #000;
+  fill-opacity: .125;
+  stroke: #fff;
+}
+
+.tooltip {
+    position: absolute;
+    width: 300px;
+    height: 100px;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+#wrap{
+  border: 1px solid white;
+  width: 600px;
+}
+
+div {
+  float: left;
+  margin-right: 10px;
+}
+</style>
+</head>
+
+<div class="container" id="wrap">
+  <h2></h2>
+  <div>
+  <button type="button" class="btn btn-default" id="clear-select">Clear selection</button>
+  </div>
+  <div>
+    Selection mode:
+  <form>
+		<label class="radio-inline" "active"><input type="radio" name="optradio" id="select-disab" checked="">disabled</label>
+    <label class="radio-inline"><input type="radio" name="optradio" id="brush-enab">brush</label>
+    <label class="radio-inline"><input type="radio" name="optradio" id="click-select">click</label>
+  </form>
+  </div>
+</div>
+
+<body>
+<script>
+
+var width = 2420,
+    size = 375,
+    padding = 19.5;
+
+var x = d3.scale.linear()
+    .range([padding / 2, size - padding / 2]);
+
+var y = d3.scale.linear()
+    .range([size - padding / 2, padding / 2]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .ticks(5);
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .ticks(5);
+
+var color = d3.scale.category10();
+
+// add the tooltip area to the webpage
+var tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("opacity", 0);
+
+var brushCell;
+
+var modselection = JSON.parse(localStorage.getItem("modselection"));
+var selection = (localStorage.getItem("selection") == null) ? [] : JSON.parse(localStorage.getItem("selection"));
+
+d3.tsv("koper.tsv", function(error, data) {
+  var domainBySolution = {},
+      rownames = d3.keys(data[0]).filter(function(d) { return d.indexOf("LeNC") == 0; }),
+      xnames = rownames.filter(function (d) { return d[d.length-1] == "x" }),
+      solutions = modselection;
+      solutions.reverse();
+
+// Define the size of the matrix
+      n = 3;
+
+      solutions.forEach(function(solution) {
+         domainBySolution[solution+".x"] = d3.extent(data, function(d) { return +d[solution+".x"]; });
+         domainBySolution[solution+".y"] = d3.extent(data, function(d) { return +d[solution+".y"]; });
+      });
+
+      xAxis.tickSize(size * n);
+      yAxis.tickSize(-size * n);
+
+      var brush = d3.svg.brush()
+          .x(x)
+          .y(y)
+          .on("brushstart", brushstart)
+          .on("brush", brushmove)
+          .on("brushend", brushend);
+
+      var svg = d3.select("body").append("svg")
+	     .attr("width", size * n + padding)
+	     .attr("height", size * n + padding)
+	     .append("g")
+	     .attr("transform", "translate(" + padding + "," + padding / 2 + ")");
+
+      svg.selectAll(".x.axis")
+      .data(solutions)
+      .enter().append("g")
+      .attr("class", "x axis")
+      .attr("transform", function(d, i) { return "translate(" + (n - i - 1) * size + ",0)"; })
+      .each(function(d) { x.domain(domainBySolution[d+".x"]); d3.select(this).call(xAxis); });
+
+      svg.selectAll(".y.axis")
+      .data(solutions)
+      .enter().append("g")
+      .attr("class", "y axis")
+      .attr("transform", function(d, i) { return "translate(0," + i * size + ")"; })
+      .each(function(d) { y.domain(domainBySolution[d+".y"]); d3.select(this).call(yAxis); });
+
+
+  var cell = svg.selectAll(".cell")
+      .data(combine(solutions))
+      .enter().append("g")
+      .attr("class", "cell")
+      .attr("transform", function(d) { return "translate(" + (n - +d.i - 1) * size + "," + +d.j * size + ")"; })
+      .each(plot);
+
+// Titles for all plots.
+  cell.append("text")
+    .attr("x", padding)
+    .attr("y", padding)
+    .attr("dy", ".71em")
+    .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }})
+//    .on('click', function(d) {console.log(d.x.substring(0, d.x.length-2));});
+    .on('click', function(d) {
+      localStorage.setItem("goToPlot", d.x.substring(0, d.x.length-2));
+      window.location = "level3.html";
+    });
+
+    function clearBrush(){
+      cell.selectAll('.brush').remove();
+    }
+
+    var brushEnab = false;
+    d3.select("#brush-enab").on("change", function() {
+              brushEnab = this.checked;
+							clickSelect = false;
+              if (brushEnab) {
+                cell.append("g")
+                  .attr("class", "brush")
+                  .call(brush);
+              } else {
+//                location.reload();
+                clearBrush();
+              }
+            });
+
+	d3.select("#select-disab").on("click", function() {
+		brushEnab = false;
+		clickSelect = false;
+		clearBrush();
+	});
+
+  var clickSelect = false;
+  d3.select("#click-select").on("change", function() {
+    clickSelect = this.checked;
+		brushEnab = false;
+		clearBrush();
+  });
+
+  d3.select("#clear-select").on("click", function() {
+    clearBrush();
+    selection = []
+    localStorage.setItem("selection", JSON.stringify(selection));
+    svg.selectAll(".selected").classed("selected", false);
+    d3.selectAll('input').property('checked', false);
+    clickSelect = false;
+  });
+
+  d3.select("#ldown").on("click", function() {
+    window.location = "scatplot.html";
+  });
+
+  function plot(p) {
+    var cell = d3.select(this);
+    try {
+    x.domain(domainBySolution[p.x]);
+    y.domain(domainBySolution[p.y]);
+
+    cell.append("rect")
+        .attr("class", "frame")
+        .attr("x", padding / 2)
+        .attr("y", padding / 2)
+        .attr("width", size - padding)
+        .attr("height", size - padding);
+
+    cell.selectAll("circle")
+        .data(data)
+	      .enter().append("circle")
+        .attr("cx", function(d) { return x(d[p.x]); })
+        .attr("cy", function(d) { return y(d[p.y]); })
+        .attr("r", 5)
+        .style("fill", function(d) { return color(d.label); })
+        .classed("selected", function(d) {
+            if (selection.length > 0) {
+             return !(selection.indexOf(d.id) > -1);
+           }
+        })
+        .attr("pointer-events", "all")
+//        .on("click", scatterplot(p));
+        .on("click", function(d) {
+          if (clickSelect) {
+            if (selection.indexOf(d.id) === -1) {
+                selection.push(d.id);
+                console.log("push " + d.id);
+          } else {
+                var index = selection.indexOf(d.id);
+                if (index > -1) {
+                  selection.splice(index, 1);
+                }
+                console.log("splice " + d.id);
+          }
+            if (selection.length > 0) {
+                svg.selectAll("circle").classed("selected", function(d) {
+                    return !(selection.indexOf(d.id) > -1);
+            })
+          }
+            localStorage.setItem("selection", JSON.stringify(selection));
+          }
+          })
+      } catch (e) {
+        console.log("combinations missing")
+      }
+  }
+
+  // Clear the previously-active brush, if any.
+  function brushstart(p) {
+    if (brushCell !== this) {
+      try {
+      d3.select(brushCell).call(brush.clear());
+      x.domain(domainBySolution[p.x]);
+      y.domain(domainBySolution[p.y]);
+      brushCell = this;
+    } catch (e) {
+      console.log("combinations missing")
+    }
+    }
+  }
+
+  // Highlight the selected circles.
+  function brushmove(p) {
+    var e = brush.extent();
+//    console.log(e);
+    svg.selectAll("circle").classed("selected", function(d) {
+      return e[0][0] > d[p.x] || d[p.x] > e[1][0]
+          || e[0][1] > d[p.y] || d[p.y] > e[1][1];
+    });
+  }
+
+  // If the brush is empty, select all circles.
+  function brushend() {
+    if (brush.empty()) {
+      svg.selectAll(".selected").classed("selected", false);
+    } else {
+      selection = [];
+      svg.selectAll("circle").each(function(d) {
+        if (!(d3.select(this).classed("selected"))) {
+          if (selection.indexOf(d.id) === -1) {
+              selection.push(d.id);
+            }
+          }
+      });
+      localStorage.setItem("selection", JSON.stringify(selection));
+    }
+  }
+
+  function combine(s) {
+    var c = [], n = s.length, i, j, k = 0;
+    for (j = -1; ++j < n%4;) for (i = -1; ++i < 3;) if (k < n) c.push({x: s[k]+".x", i: i, y: s[k]+".y", j: j}), ++k;
+      return c;
+    }
+
+// d3.select('button').on('click', function() {
+  function scatplot(whatever) {
+    d3.select("svg").remove();
+    d3.select("div").remove();
+
+    // add the tooltip area to the webpage
+    var tooltip = d3.select("body").append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0);
+
+    var dataset;
+    d3.tsv("koper.tsv", function(data) {
+    dataset = data;
+
+    //Width and height
+    var width = 600;
+    var height = 600;
+    var padding = 30;
+
+    //Create scale functions
+    var xScale = d3.scale.linear()
+               .domain([d3.min(dataset, function(d) { return +d[whatever+".x"]; }) * 1.1, d3.max(dataset, function(d) { return +d[whatever+".x"]; }) * 1.1])
+               //								 .domain(d3.extent(dataset, function(d) { return +d["LeNC44.ppmi.x"]; }))
+               .range([padding, width - padding * 2]);
+
+    var yScale = d3.scale.linear()
+               .domain([d3.min(dataset, function(d) { return +d[whatever+".y"]; }) * 1.1, d3.max(dataset, function(d) { return +d[whatever+".y"]; }) * 1.1])
+               .range([height - padding, padding]);
+
+    //Define X axis
+    var xAxis = d3.svg.axis()
+              .scale(xScale)
+              .orient("bottom")
+              .ticks(10)
+              .outerTickSize(0);
+
+    //Define Y axis
+    var yAxis = d3.svg.axis()
+              .scale(yScale)
+              .orient("left")
+              .ticks(10)
+              .outerTickSize(0);
+
+    //Zoom
+    var zoom = d3.behavior.zoom()
+          .scaleExtent([1, 10])
+          .on("zoom", zoomed);
+
+    //Create SVG element
+    var svg = d3.select("body")
+          .append("svg")
+          .attr("width", width)
+          .attr("height", height)
+          .append("g")
+          .call(zoom);
+
+    var rect = svg.append("rect")
+          .attr("width", width)
+          .attr("height", height)
+          .style("fill", "none")
+          .style("pointer-events", "all");
+
+    var container = svg.append("g");
+
+    //Create color scale
+    var getColors = d3.scale.category10();
+
+    //Create dot size scale
+    var getClustSize = d3.scale.sqrt();
+
+    var brush = d3.svg.brush()
+        .x(xScale)
+        .y(yScale)
+        .on("brush", brushmove)
+        .on("brushend", brushend);
+
+    dot = container.append("g")
+       .attr("class", "dot")
+       .selectAll("circle")
+       .data(dataset)
+       .enter()
+       .append("circle")
+       .attr("cx", function(d) {
+          return xScale(+d[whatever+".x"]);
+       })
+       .attr("cy", function(d) {
+          return yScale(+d[whatever+".y"]);
+       })
+//       .attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);})
+//				 .attr("r", 3)
+       .style("fill", function(d) { return getColors(d.label); })
+       .on("mouseover", function(d) {
+            tooltip.transition()
+              .duration(200)
+              .style("opacity", .9);
+              tooltip.html("<b>"+d.id+"</b><br>"+d.text)
+              .style("left", (d3.event.pageX + 20) + "px")
+              .style("top", (d3.event.pageY - 28) + "px");
+    svg.selectAll("circle").style("opacity", .2);
+    d3.select(this).attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);}).style("fill", "red").style("opacity", 1);
+        })
+        .on("mouseout", function(d) {
+            tooltip.transition()
+              .duration(500)
+              .style("opacity", 0);
+        svg.selectAll("circle").attr("r", function(d) {return getClustSize(+d[whatever+".maxW"]*5);}).style("fill", function(d) { return getColors(d.label); }).style("opacity", 1);
+        });
+
+    //Create X axis
+    container.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + (height - padding) + ")")
+      .call(xAxis);
+
+    //Create Y axis
+    container.append("g")
+      .attr("class", "y axis")
+      .attr("transform", "translate(" + padding + ",0)")
+      .call(yAxis);
+
+    function zoomed() {
+      container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    }
+
+//    container.append("g")
+//        .attr("class", "brush")
+//        .call(brush);
+
+    // Restore the previous brush selection
+    svg.selectAll("circle").classed("selected", function(d) {
+      return e[0][0] > +d[whatever+".x"] || +d[whatever+".x"] > e[1][0]
+      || e[0][1] > +d[whatever+".y"] || +d[whatever+".y"] > e[1][1];
+    });
+
+    // Highlight the selected circles.
+    function brushmove() {}
+
+    // If the brush is empty, select all circles.
+    function brushend() {
+      if (brush.empty()) svg.selectAll(".selected").classed("selected", false);
+    }
+
+
+    });
+  }
+
+  d3.select(self.frameElement).style("height", size * n + padding + 20 + "px");
+
+});
+
+</script>
