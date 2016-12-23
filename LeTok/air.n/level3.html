@@ -136,6 +136,7 @@
 			numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
 			var numSet = new Set();
 			numericals.forEach(function (d) { numSet.add(new RegExp("([^.]+)$").exec(d.key)[0]); });
+			console.log(numericals);
 
 			models = JSON.parse(localStorage.getItem("modselection"));
 
@@ -281,7 +282,7 @@
           		tooltip.transition()
 					.duration(200)
 					.style("opacity", .9);
-          		tooltip.html("<b>"+d["_id"] + "</b><br>"+d["_text"] + (typeof sset  !== "undefined" ? "<p><b>"+sset+"</b>: " + d[sset] : "" ))
+          		tooltip.html("<b>"+d["_id"] + "</b><br>"+d["_text"] + (typeof sset  !== "undefined" ? "<p><b>"+sset.split('.').slice(-1)[0]+"</b>: " + d[sset] : "" ))
 					.style("left", (d3.event.pageX + 20) + "px")
 					.style("top", (d3.event.pageY - 28) + "px");
 //				svg.select(".dot").selectAll("path").style("opacity", .6);
