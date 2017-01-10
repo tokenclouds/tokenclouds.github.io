@@ -128,7 +128,7 @@
 
 			nominals = firstRow.filter(function(d) { if (!isNumber(d.value) && !d.key.startsWith("_")) { return d.key; } });
 			numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
-			console.log(nominals)
+			console.log(firstRow)
 			// colours = ["wWindow", "wScheme"];
 			// size = ["windowSize", "MDSstress"];
 
@@ -510,9 +510,10 @@
 					"aoColumns": [
 						{ mDataProp: "_id" },
 						{ mDataProp: "BNCweighting" },
-						{ mDataProp: "contextWindow" },
-						{ mDataProp: "weightScheme" },
-						{ mDataProp: "weightWindow" },
+						{ mDataProp: "FirstOrderWeighting"},
+						{ mDataProp: "ContextWindow" },
+						{ mDataProp: "SecondOrderScore" },
+						{ mDataProp: "SecondOrderWindow" },
 						{ mDataProp: "stress"}
 					]
 				});
