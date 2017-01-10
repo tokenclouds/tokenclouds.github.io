@@ -1,4 +1,4 @@
-_id	model.x	model.y	BNCweighting	FirstOrderWeighting	ContextWindow	SecondOrderWindow	SecondOrderScore	stress
+_id	model.x	model.y	FirstOrderWeighting	BNCweighting	ContextWindow	SecondOrderWindow	SecondOrderScore	stress
 air.n.10-10.weightsNONE.10-10.diceM	-8.26880160793806	-1.8679177432629	none	none	L10-R10	L10-R10	diceM	22.99
 air.n.10-10.weightsNONE.10-10.LLR	-7.92358559843325	-3.33191075204045	none	none	L10-R10	L10-R10	LLR	27.27
 air.n.10-10.weightsNONE.10-10.pospmi	-2.32530628948808	-0.532665552415096	none	none	L10-R10	L10-R10	pospmi	21.38
