@@ -135,17 +135,17 @@ var tooltip = d3.select("body").append("div")
 
 var brushCell;
 
-var cset = (localStorage.getItem("cset") == null) ? [] : JSON.parse(localStorage.getItem("cset"));
-var shset = (localStorage.getItem("shset") == null) ? [] : JSON.parse(localStorage.getItem("shset"));
-var sset = (localStorage.getItem("sset") == null) ? [] : JSON.parse(localStorage.getItem("sset"));
+var type = window.location.pathname.split("/")[2]
 
-var modselection = JSON.parse(localStorage.getItem("modselection"));
-var goToPlot = JSON.parse(localStorage.getItem("modselection"))[0];
-var selection = (localStorage.getItem("selection") == null) ? [] : JSON.parse(localStorage.getItem("selection"));
+var cset = (localStorage.getItem("cset"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("cset"+"-"+type)));
+var shset = (localStorage.getItem("shset"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("shset"+"-"+type)));
+var sset = (localStorage.getItem("sset"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("sset"+"-"+type)));
+
+var modselection = JSON.parse(localStorage.getItem("modselection"+"-"+type));
+var goToPlot = JSON.parse(localStorage.getItem("modselection"+"-"+type))[0];
+var selection = (localStorage.getItem("selection"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("selection"+"-"+type)));
 
 var dataset;
-
-var type = window.location.pathname.split("/")[2]
 
 d3.tsv(type+".tsv", function(error, data) {
   dataset = data;
@@ -291,7 +291,7 @@ d3.tsv(type+".tsv", function(error, data) {
 		} else {
 			modselection.splice(index, 1)
 		}
-		localStorage.setItem("modselection", JSON.stringify(modselection));
+		localStorage.setItem("modselection"+"-"+type, JSON.stringify(modselection));
 	});
 
 // Titles for all plots.
@@ -302,7 +302,7 @@ d3.tsv(type+".tsv", function(error, data) {
     .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }})
 //    .on('click', function(d) {console.log(d.x.substring(0, d.x.length-2));});
     .on('click', function(d) {
-      localStorage.setItem("goToPlot", d.x.substring(0, d.x.length-2));
+      localStorage.setItem("goToPlot"+"-"+type, d.x.substring(0, d.x.length-2));
       window.location = "level3.html";
     });
 
@@ -335,7 +335,7 @@ d3.tsv(type+".tsv", function(error, data) {
   d3.select("#clear-select").on("click", function() {
     clearBrush();
     selection = []
-    localStorage.setItem("selection", JSON.stringify(selection));
+    localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
     svg.selectAll(".selected").classed("selected", false);
     d3.selectAll('input').property('checked', false);
     clickSelect = false;
@@ -343,19 +343,19 @@ d3.tsv(type+".tsv", function(error, data) {
 
   d3.selectAll(".col").on("click", function() {
 	  cset = this.getAttribute("value");
-	  localStorage.setItem("cset", JSON.stringify(cset));
+	  localStorage.setItem("cset"+"-"+type, JSON.stringify(cset));
 	  updatePlots();
   });
 
   d3.selectAll(".shape").on("click", function() {
 	  shset = this.getAttribute("value");
-	  localStorage.setItem("shset", JSON.stringify(shset));
+	  localStorage.setItem("shset"+"-"+type, JSON.stringify(shset));
 	  updatePlots();
   });
 
   d3.selectAll(".siz").on("click", function() {
 	sset = this.getAttribute("value");
-	localStorage.setItem("sset", JSON.stringify(sset));
+	localStorage.setItem("sset"+"-"+type, JSON.stringify(sset));
 	updatePlots();
   });
 
@@ -394,10 +394,10 @@ d3.tsv(type+".tsv", function(error, data) {
 		.append("path")
 		.attr("transform", function(d) { return "translate(" + x(d[p.x]) + "," + y(d[p.y]) + ")"; })
 		.attr("d", d3.svg.symbol()
-			.type(function (d) { (shset.length === 0) ? out="circle" : out=getShape(d[shset]); return out; })
-			.size(function (d) { (sset.length === 0) ? out=64 : out=getClustSize(+d[p.mod+"."+sset])*32; return out; }))
+			.type(function (d) { (shset === (undefined || null)) ? out="circle" : out=getShape(d[shset]); return out; })
+			.size(function (d) { (sset === (undefined || null)) ? out=64 : out=getClustSize(+d[p.mod+"."+sset])*32; return out; }))
 //		.attr("d", d3.svg.symbol("circle"))
-		.style("fill", function(d) { (cset.length === 0) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
+		.style("fill", function(d) { (cset === (undefined || null)) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
         .classed("selected", function(d) {
             if (selection.length > 0) {
              return !(selection.indexOf(d["_id"]) > -1);
@@ -423,7 +423,7 @@ d3.tsv(type+".tsv", function(error, data) {
                     return !(selection.indexOf(d["_id"]) > -1);
             })
           }
-            localStorage.setItem("selection", JSON.stringify(selection));
+            localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
           }
           })
       } catch (e) {
@@ -468,7 +468,7 @@ d3.tsv(type+".tsv", function(error, data) {
             }
           }
       });
-      localStorage.setItem("selection", JSON.stringify(selection));
+      localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
     }
   }
 

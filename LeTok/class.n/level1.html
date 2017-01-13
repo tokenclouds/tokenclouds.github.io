@@ -99,13 +99,13 @@
 			var shset;
 			var legendParam;
 
-			var cset = (localStorage.getItem("l1cset") == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"));
-			var shset = (localStorage.getItem("l1shset") == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"));
-			var sset = (localStorage.getItem("l1sset") == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"));
-
-			var selection = (localStorage.getItem("modselection") == null) ? [] : JSON.parse(localStorage.getItem("modselection"));
-
 			var type = window.location.pathname.split("/")[2]
+
+			var cset = (localStorage.getItem("l1cset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"+"-"+type));
+			var shset = (localStorage.getItem("l1shset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"+"-"+type));
+			var sset = (localStorage.getItem("l1sset"+"-"+type) == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"+"-"+type));
+
+			var selection = (localStorage.getItem("modselection"+"-"+type) == null) ? [] : JSON.parse(localStorage.getItem("modselection"+"-"+type));
 
 			d3.tsv(type+".models.tsv", function(error, data) {
 				dataset = data;
@@ -307,7 +307,7 @@
 									return !(selection.indexOf(d["_id"]) > -1);
 								})
 							}
-							localStorage.setItem("modselection", JSON.stringify(selection));
+							localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
 					});
 
 			//Create X axis
@@ -325,21 +325,21 @@
  				//On menu change, update colour and/or size
 				d3.selectAll(".col").on("click", function() {
 					cset = this.getAttribute("value");
-					localStorage.setItem("l1cset", JSON.stringify(cset));
+					localStorage.setItem("l1cset"+"-"+type, JSON.stringify(cset));
 					legendParam = cset;
 					updateData("colour");
 				});
 
 				d3.selectAll(".shape").on("click", function() {
 					shset = this.getAttribute("value");
-					localStorage.setItem("l1shset", JSON.stringify(shset));
+					localStorage.setItem("l1shset"+"-"+type, JSON.stringify(shset));
 					legendParam = shset;
 					updateData("shape");
 				});
 
 				d3.selectAll(".siz").on("click", function() {
 					sset = this.getAttribute("value");
-					localStorage.setItem("l1sset", JSON.stringify(sset));
+					localStorage.setItem("l1sset"+"-"+type, JSON.stringify(sset));
 					updateData("size");
 				});
 
@@ -350,12 +350,12 @@
 
  				d3.select("#clear-select").on("click", function() {
  					selection = []
- 					localStorage.setItem("modselection", JSON.stringify(selection));
+ 					localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
  					svg.selectAll(".selected").classed("selected", false);
  				});
 
 				d3.select("#confirm-select").on("click", function() {
-					localStorage.setItem("goToPlot", JSON.parse(localStorage.getItem("modselection"))[0].substring(0, JSON.parse(localStorage.getItem("modselection"))[0].length-2));
+					localStorage.setItem("goToPlot"+"-"+type, JSON.parse(localStorage.getItem("modselection"+"-"+type))[0].substring(0, JSON.parse(localStorage.getItem("modselection"+"-"+type))[0].length-2));
 					window.location = "level2.html";
  				});
 

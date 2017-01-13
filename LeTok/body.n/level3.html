@@ -91,21 +91,21 @@
 			var dataset;
 			var firstRow;
 
-			var cset = (localStorage.getItem("cset") == null) ? [] : JSON.parse(localStorage.getItem("cset"));
-			var shset = (localStorage.getItem("shset") == null) ? [] : JSON.parse(localStorage.getItem("shset"));
-			var sset = (localStorage.getItem("sset") == null) ? [] : JSON.parse(localStorage.getItem("sset"));
+			var type = window.location.pathname.split("/")[2]
+
+			var cset = (localStorage.getItem("cset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("cset"+"-"+type)));
+			var shset = (localStorage.getItem("shset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("shset"+"-"+type)));
+			var sset = (localStorage.getItem("sset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("sset"+"-"+type)));
 			var mset;
 			var legendParam;
 
-			var selection = (localStorage.getItem("selection") == null) ? [] : JSON.parse(localStorage.getItem("selection"));
+			var selection = (localStorage.getItem("selection"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("selection"+"-"+type)));
 			var goToPlot;
 			d3.selection.prototype.moveToFront = function() {
 				return this.each(function(){
 				this.parentNode.appendChild(this);
 				});
 			};
-
-			var type = window.location.pathname.split("/")[2]
 
 			d3.tsv(type+".tsv", function(data) {
 //				dataset = data.filter(function (obs) { return obs !== null;});
@@ -121,7 +121,7 @@
 			// Takes the first columns that end with ".x" and ".y"
 			xcol = colnames.filter(function(d) { return d.endsWith(".x"); })[0];
 			ycol = colnames.filter(function(d) { return d.endsWith(".y"); })[0];
-			goToPlot = (localStorage.getItem("goToPlot") == null) ? JSON.parse(localStorage.getItem("modselection"))[0] : localStorage.getItem("goToPlot");
+			goToPlot = localStorage.getItem("goToPlot"+"-"+type) == (undefined || null) ? JSON.parse(localStorage.getItem("modselection"+"-"+type))[0] : localStorage.getItem("goToPlot"+"-"+type);
 			mset = goToPlot;
 			// sset = mset + "." + sset;
 			// console.log("sset: " + sset);
@@ -141,7 +141,7 @@
 			numericals.forEach(function (d) { numSet.add(new RegExp("([^.]+)$").exec(d.key)[0]); });
 			console.log(numericals);
 
-			models = JSON.parse(localStorage.getItem("modselection"));
+			models = JSON.parse(localStorage.getItem("modselection"+"-"+type));
 
 			// Create selection menu for colour-coding
 			var colourDropDown = d3.select("#colour")
@@ -271,12 +271,12 @@
 			  //  })
 				.attr("transform", function(d) { return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")"; })
 				.attr("d", d3.svg.symbol()
-					.type(function (d) { (shset.length === 0) ? out="circle" : out=getShape(d[shset]); return out; })
-					.size(function (d) { (sset.length === 0) ? out=64 : out=getClustSize(+d[sset])*32; return out; }))
+					.type(function (d) { (shset === (undefined || null)) ? out="circle" : out=getShape(d[shset]); return out; })
+					.size(function (d) { (sset === (undefined || null)) ? out=64 : out=getClustSize(+d[sset])*32; return out; }))
 //				 .attr("r", 5)
-				.style("fill", function(d) { (cset.length === 0) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
+				.style("fill", function(d) { (cset === (undefined || null)) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
 				.classed("selected", function(d) {
-					if (selection.length > 0) {
+					if (selection) {
 						return !(selection.indexOf(d["_id"]) > -1);
 					}
 				 })
@@ -285,7 +285,7 @@
           		tooltip.transition()
 					.duration(200)
 					.style("opacity", 1);
-          		tooltip.html("<b>"+d["_id"] + "</b><br>"+d["_text"] + (sset.length  !== 0 ? "<p><b>"+sset.split('.').slice(-1)[0]+"</b>: " + d[sset] : "" ) + ("<p><b>maxWeightedWord:</b> " + d[mset+".maxWeightedWord"]))
+          		tooltip.html("<b>"+d["_id"] + "</b><br>"+d["_text"] + (sset ? "<p><b>"+sset.split('.').slice(-1)[0]+"</b>: " + d[sset] : "" ) + ("<p><b>maxWeightedWord:</b> " + d[mset+".maxWeightedWord"]))
 					.style("left", (d3.event.pageX + 20) + "px")
 					.style("top", (d3.event.pageY - 28) + "px");
 //				svg.select(".dot").selectAll("path").style("opacity", .6);
@@ -304,7 +304,7 @@
           		tooltip.transition()
 				.duration(500)
 				.style("opacity", 0);
-				if (selection.length > 0) {
+				if (selection) {
 					d3.select(this).classed("selected", function(d) {
 					return (selection.indexOf(d["_id"]) === -1);
 					});
@@ -322,12 +322,12 @@
 						selection.splice(index, 1);
 					}
 				}
-				if (selection.length > 0) {
+				if (selection) {
 					svg.select(".dot").selectAll("path:not(.selector)").classed("selected", function(d) {
 						return !(selection.indexOf(d["_id"]) > -1);
 					})
 				}
-				localStorage.setItem("selection", JSON.stringify(selection));
+				localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
 			});
 
 			svg.selectAll("path").attr("data-legend", function (d) {
@@ -370,7 +370,7 @@
 					if (colnames.indexOf(cset) === -1) {
 						cset = mset + "." + this.getAttribute("value");
 					}
-					localStorage.setItem("cset", JSON.stringify(cset));
+					localStorage.setItem("cset"+"-"+type, JSON.stringify(cset));
 					legendParam = cset;
 					updateVisFeat("colour");
 				});
@@ -380,14 +380,14 @@
 					if (colnames.indexOf(shset) === -1) {
 						shset = mset + "." + this.getAttribute("value");
 					}
-					localStorage.setItem("shset", JSON.stringify(shset));
+					localStorage.setItem("shset"+"-"+type, JSON.stringify(shset));
 					legendParam = shset;
 					updateVisFeat("shape");
 				});
 
 				d3.selectAll(".siz").on("click", function() {
 					sset = this.getAttribute("value");
-					localStorage.setItem("sset", JSON.stringify(sset));
+					localStorage.setItem("sset"+"-"+type, JSON.stringify(sset));
 					//To switch between levels, size needs to be saved to localStorage without model specification
 					if (colnames.indexOf(sset) === -1) {
 						sset = mset + "." + this.getAttribute("value");
@@ -405,7 +405,7 @@
 
  				d3.select("#clear-select").on("click", function() {
  					selection = []
- 					localStorage.setItem("selection", JSON.stringify(selection));
+ 					localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
  					svg.selectAll(".selected").classed("selected", false);
  				});
 
