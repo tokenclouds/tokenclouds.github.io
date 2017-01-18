@@ -6,6 +6,9 @@
 		<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
 		<script src="d3.legend.js"></script>
 		<script type="text/javascript" src="https://code.jquery.com/jquery-latest.min.js"></script>
+		<script src="//cdn.datatables.net/1.10.12/js/jquery.dataTables.min.js"></script>
+		<link rel="stylesheet" href="//cdn.datatables.net/1.10.12/css/jquery.dataTables.min.css">
+		<link rel="stylesheet" href="//cdn.datatables.net/1.10.12/css/dataTables.bootstrap.min.css">
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
 		<style type="text/css">
@@ -49,14 +52,15 @@
   			fill:white;
   			stroke:black;
   			opacity:0.8;}
-
 		</style>
 	</head>
 
 	<div id="wrap">
+		<div><button type="button" class="btn btn-default" id="memory-clear">Clear memory</button></div>
 		<div><button type="button" class="btn btn-default" id="clear-select">Clear selection</button></div>
 		<div><button type="button" class="btn btn-default" id="confirm-select">Confirm selection</button></div>
 
+		<div>
 		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select colour<span class="caret"></span></button>
 			<ul class="dropdown-menu" id="colour"></ul>
 		</div>
@@ -65,6 +69,7 @@
 		</div>
 		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select size<span class="caret"></span></button>
 			<ul class="dropdown-menu" id="size"></ul>
+		</div>
 		</div>
 	</div>
 	<br>
@@ -76,6 +81,21 @@
 
 	<body>
 		<script type="text/javascript">
+		var getUrlParameter = function getUrlParameter(sParam) {
+			var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+				sURLVariables = sPageURL.split('&'),
+				sParameterName,
+				i;
+
+			for (i = 0; i < sURLVariables.length; i++) {
+				sParameterName = sURLVariables[i].split('=');
+
+				if (sParameterName[0] === sParam) {
+					return sParameterName[1] === undefined ? true : sParameterName[1];
+				}
+			}
+		};
+
 			//Width and height
 			var w = 600;
 			var h = 600;
@@ -92,18 +112,25 @@
 			var cset;
 			var sset;
 			var shset;
+			var legendParam;
 
-			var selection = (localStorage.getItem("modselection") == null) ? [] : JSON.parse(localStorage.getItem("modselection"));
+			var type = getUrlParameter("type");
 
-			d3.tsv("kopermodels.tsv", function(error, data) {
+			var cset = (localStorage.getItem("l1cset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"+"-"+type));
+			var shset = (localStorage.getItem("l1shset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"+"-"+type));
+			var sset = (localStorage.getItem("l1sset"+"-"+type) == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"+"-"+type));
+
+			var selection = (localStorage.getItem("modselection"+"-"+type) == null) ? [] : JSON.parse(localStorage.getItem("modselection"+"-"+type));
+
+			d3.tsv(type+".models.tsv", function(error, data) {
 				dataset = data;
 
 			// Extracts the first token name, assumes this is the type and sets it as the page title
 			//var type = data[1]["_id"].match(/\w+/)
-			var type = "koper"
+//			var type = window.location.pathname.split("/")[2]
 			document.title = "Level 1: " + type + " tokencloud models";
 			d3.select("body").select("h2").text("Level 1: " + type);
-			d3.select("body").select("p").append("a").attr("href", "level2.html").text("down");
+			d3.select("body").select("p").append("a").attr("href", "level2.html?type="+type).text("down");
 //			d3.select("body").select("p").append("p").text("isoMDS stress: " + data[0]["stress"]).style("font-size", "10px");
 
 			colnames = d3.keys(data[0]);
@@ -113,51 +140,51 @@
 			othercols = colnames.filter(function(d) {return (!d.endsWith(".x") && !d.endsWith(".y"))});
 			firstRow = d3.entries(dataset[1]).filter(function(d) { if (othercols.indexOf(d.key) >= 0) {return d.value;}; });
 			models = d3.entries(dataset).filter(function (d) {return d["_id"]});
-			console.log(models);
 
-		  // function isNumber(obj) { return !isNaN(parseFloat(obj)) }
-			//
-			// nominals = firstRow.filter(function(d) { if (!isNumber(d.value)) { return d.key; } });
-			// numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
-			colours = ["wWindow", "wScheme"];
-			size = ["windowSize", "MDSstress"];
+		  function isNumber(obj) { return !isNaN(parseFloat(obj)) }
+
+			nominals = firstRow.filter(function(d) { if (!isNumber(d.value) && !d.key.startsWith("_")) { return d.key; } });
+			numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
+			console.log(firstRow)
+			// colours = ["wWindow", "wScheme"];
+			// size = ["windowSize", "MDSstress"];
 
 			// Create selection menu for colour-coding
 			var colourDropDown = d3.select("#colour")
 									.attr("name", "Colour")
 									.selectAll("option")
-									.data(colours)
+									.data(nominals)
 									.enter()
 									.append("li")
 									.append("a")
 									.attr("class", "col")
 									.attr("xlink:href", "#")
-									.attr("value", function (d) { return d; })
-									.text(function (d) { return d; });
+									.attr("value", function (d) { return d.key; })
+									.text(function (d) { return d.key; });
 
 			var shapeDropDown = d3.select("#shape")
 									.attr("name", "Shape")
 									.selectAll("option")
-									.data(colours)
+									.data(nominals)
 									.enter()
 									.append("li")
 									.append("a")
 									.attr("class", "shape")
 									.attr("xlink:href", "#")
-									.attr("value", function (d) { return d; })
-									.text(function (d) { return d; });
+									.attr("value", function (d) { return d.key; })
+									.text(function (d) { return d.key; });
 
 			var sizeDropDown = d3.select("#size")
 									.attr("name", "Size")
 									.selectAll("option")
-									.data(size)
+									.data(numericals)
 									.enter()
 									.append("li")
 									.append("a")
 									.attr("class", "siz")
 									.attr("xlink:href", "#")
-									.attr("value", function (d) { return d; })
-									.text(function (d) { return d; });
+									.attr("value", function (d) { return d.key; })
+									.text(function (d) { return d.key; });
 			//Create random coordinates
 			// var randomCor = [];
 			// for (var i = 0; i < models.length; i++) {
@@ -193,11 +220,15 @@
 
 			//Zoom
 			var zoom = d3.behavior.zoom()
-						.scaleExtent([1, 10])
+						.scaleExtent([0, 10])
+						.x(xScale)
+						.y(yScale)
 						.on("zoom", zoomed);
 
 			//Create SVG element
 			var svg = d3.select("body")
+						.append("div")
+						.attr("class", "container")
 						.append("svg")
 						.attr("width", w)
 						.attr("height", h)
@@ -236,7 +267,7 @@
 			//    		return yScale(+d[ycol]);
 			//    })
 			// 	 .attr("r", 5)
-				.style("fill", getColors("dummy"))
+				.style("fill", function(d) { (cset === "undefined") ? out="#1f77b4" : out=getColors(d[cset]); return out; })
 				.classed("selected", function(d) {
 					if (selection.length > 0) {
 						return !(selection.indexOf(d["_id"]) > -1);
@@ -291,7 +322,7 @@
 									return !(selection.indexOf(d["_id"]) > -1);
 								})
 							}
-							localStorage.setItem("modselection", JSON.stringify(selection));
+							localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
 					});
 
 			//Create X axis
@@ -309,29 +340,38 @@
  				//On menu change, update colour and/or size
 				d3.selectAll(".col").on("click", function() {
 					cset = this.getAttribute("value");
+					localStorage.setItem("l1cset"+"-"+type, JSON.stringify(cset));
+					legendParam = cset;
 					updateData("colour");
 				});
 
 				d3.selectAll(".shape").on("click", function() {
 					shset = this.getAttribute("value");
-//					localStorage.setItem("shset", JSON.stringify(shset));
+					localStorage.setItem("l1shset"+"-"+type, JSON.stringify(shset));
+					legendParam = shset;
 					updateData("shape");
 				});
 
 				d3.selectAll(".siz").on("click", function() {
 					sset = this.getAttribute("value");
+					localStorage.setItem("l1sset"+"-"+type, JSON.stringify(sset));
 					updateData("size");
+				});
+
+				d3.select("#memory-clear").on("click", function() {
+					localStorage.clear();
+					location.reload();
 				});
 
  				d3.select("#clear-select").on("click", function() {
  					selection = []
- 					localStorage.setItem("modselection", JSON.stringify(selection));
+ 					localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
  					svg.selectAll(".selected").classed("selected", false);
  				});
 
 				d3.select("#confirm-select").on("click", function() {
-					localStorage.setItem("goToPlot", JSON.parse(localStorage.getItem("modselection"))[0].substring(0, JSON.parse(localStorage.getItem("modselection"))[0].length-2));
-					window.location = "level2.html";
+					localStorage.setItem("goToPlot"+"-"+type, JSON.parse(localStorage.getItem("modselection"+"-"+type))[0].substring(0, JSON.parse(localStorage.getItem("modselection"+"-"+type))[0].length-2));
+					window.location = "level2.html?type="+type;
  				});
 
 				function updateData(feature) {
@@ -393,8 +433,36 @@
 						return d[shset];
 					}
 				});
-				
-				//Update legend or append if not created yet after necessary (!) delay
+
+				function createLegend(legendType) {
+					if (legendType == "cset") {
+						ypos = 30;
+					} else if (legendType == "shset") {
+						ypos = 100;
+					} else {
+						ypos = 30;
+					}
+					legend = container.append("g")
+						.attr("class","legend")
+						.attr("transform","translate(500," + ypos + ")")
+						.style("font-size","12px")
+						.call(d3.legend);
+				}
+
+				// if (cset !== "undefined" | shset !== "undefined") {
+				// 	createLegend();
+				// }
+
+				// if (cset !== "undefined" | shset !=="undefined") {
+				// 	createLegend("cset");
+				// 	createLegend("shset");
+				// } else if (cset !== "undefined") {
+				// 	createLegend("cset");
+				// } else if (shset !== "undefined") {
+				// 	createLegend("shset");
+				// }
+
+//				Update legend or append if not created yet after necessary (!) delay
 				if (typeof cset !== "undefined") {
 					setTimeout(function() {
 						if (typeof legend !== "undefined") {
@@ -408,13 +476,68 @@
 						}
 					},100)
 				}
+				if (typeof shset !== "undefined") {
+					setTimeout(function() {
+						if (typeof legend !== "undefined") {
+							legend.call(d3.legend)
+						} else {
+							legend = container.append("g")
+								.attr("class","legend")
+								.attr("transform","translate(500,100)")
+								.style("font-size","12px")
+								.call(d3.legend)
+						}
+					},100)
+				}
+				svg.call(zoom);
 			}
 
 			function zoomed() {
-				container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+				svg.selectAll(".selector").remove();
+				svg.select("g.x.axis").call(xAxis);
+				svg.select("g.y.axis").call(yAxis);
+				svg.selectAll("path:not(.immutable)").attr("transform", transform);
 			}
 
+			function transform(d) {
+				// Dirty fix for empty path element
+				if (d !== 0) {
+					return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")";
+				}
+			}
+
+			var table = d3.select("body")
+							.append("div")
+							.attr("class", "container")
+							.append("table")
+							.attr("id", "dataframe")
+							.attr("class", "table table-striped table-bordered")
+							.attr("cellspacing", "0")
+							.attr("width", "100%")
+							.append("thead")
+							.selectAll("tr")
+							.data(othercols)
+							.enter()
+							.append("th")
+							.text(function (d) { return d; });
+
+			$(document).ready(function() {
+				$('#dataframe').DataTable( {
+					"aaData" : dataset,
+					"aoColumns": [
+						{ mDataProp: "_id" },
+						{ mDataProp: "FirstOrderWeighting"},
+						{ mDataProp: "BNCweighting" },
+						{ mDataProp: "contextWindow" },
+						{ mDataProp: "SecondOrderWindow" },
+						{ mDataProp: "SecondOrderScore" },
+						{ mDataProp: "stress"}
+					]
+				});
 			});
+
+	});
 		</script>
+
 	</body>
 </html>
