@@ -109,16 +109,16 @@
 			var dataset;
 			var firstRow;
 
-			var cset;
-			var sset;
-			var shset;
+			var l1cset;
+			var l1sset;
+			var l1shset;
 			var legendParam;
 
 			var type = getUrlParameter("type");
 
-			var cset = (localStorage.getItem("l1cset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"+"-"+type));
-			var shset = (localStorage.getItem("l1shset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"+"-"+type));
-			var sset = (localStorage.getItem("l1sset"+"-"+type) == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"+"-"+type));
+			var l1cset = (localStorage.getItem("l1cset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"+"-"+type));
+			var l1shset = (localStorage.getItem("l1shset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"+"-"+type));
+			var l1sset = (localStorage.getItem("l1sset"+"-"+type) == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"+"-"+type));
 
 			var selection = (localStorage.getItem("modselection"+"-"+type) == null) ? [] : JSON.parse(localStorage.getItem("modselection"+"-"+type));
 
@@ -185,15 +185,21 @@
 									.attr("xlink:href", "#")
 									.attr("value", function (d) { return d.key; })
 									.text(function (d) { return d.key; });
-			//Create random coordinates
-			// var randomCor = [];
-			// for (var i = 0; i < models.length; i++) {
-    	// 		var newX = Math.random() * 30;
-			// 		var newY = Math.random() * 30;
-			// 		var newObject = {x:newX, y:newY, name:models[i].substring(0, models[i].length-2), wWindow:models[i].substring(0, 6), wScheme:models[i].substring(7, models[i].length)}
-			// 		randomCor.push(newObject);
-			// }
-			// console.log(randomCor);
+
+			// Add a "reset" option
+			function addReset(selector, reference) {
+				d3.select(selector)
+					.append("li")
+					.append("a")
+					.attr("class", reference)
+					.attr("xlink:href", "#")
+					.attr("value", "reset")
+					.text("Reset");
+			}
+
+			addReset("#size", "siz");
+			addReset("#shape", "shape");
+			addReset("#colour", "col");
 
 			//Create scale functions
 			var xScale = d3.scale.linear()
@@ -267,7 +273,7 @@
 			//    		return yScale(+d[ycol]);
 			//    })
 			// 	 .attr("r", 5)
-				.style("fill", function(d) { (cset === "undefined") ? out="#1f77b4" : out=getColors(d[cset]); return out; })
+				.style("fill", function(d) { (l1cset === "undefined") ? out="#1f77b4" : out=getColors(d[l1cset]); return out; })
 				.classed("selected", function(d) {
 					if (selection.length > 0) {
 						return !(selection.indexOf(d["_id"]) > -1);
@@ -278,7 +284,7 @@
           		tooltip.transition()
 					.duration(200)
 					.style("opacity", .9);
-          		tooltip.html("<b>" + d["_id"] + "</b>" + (typeof sset  !== "undefined" ? "<p><b>"+sset+"</b>: " + d[sset] : "" ))
+          		tooltip.html("<b>" + d["_id"] + "</b>" + (typeof l1sset  !== "undefined" ? "<p><b>"+l1sset+"</b>: " + d[l1sset] : "" ))
 					.style("left", (d3.event.pageX + 20) + "px")
 					.style("top", (d3.event.pageY - 28) + "px");
 //				svg.select(".dot").selectAll("circle").style("opacity", .2);
@@ -339,22 +345,25 @@
 
  				//On menu change, update colour and/or size
 				d3.selectAll(".col").on("click", function() {
-					cset = this.getAttribute("value");
-					localStorage.setItem("l1cset"+"-"+type, JSON.stringify(cset));
-					legendParam = cset;
+					value = this.getAttribute("value");
+					(value == "reset") ? l1cset = null : l1cset = value
+					localStorage.setItem("l1cset"+"-"+type, JSON.stringify(l1cset));
+					legendParam = l1cset;
 					updateData("colour");
 				});
 
 				d3.selectAll(".shape").on("click", function() {
-					shset = this.getAttribute("value");
-					localStorage.setItem("l1shset"+"-"+type, JSON.stringify(shset));
-					legendParam = shset;
+					value = this.getAttribute("value");
+					(value == "reset") ? l1shset = null : l1shset = value
+					localStorage.setItem("l1shset"+"-"+type, JSON.stringify(l1shset));
+					legendParam = l1shset;
 					updateData("shape");
 				});
 
 				d3.selectAll(".siz").on("click", function() {
-					sset = this.getAttribute("value");
-					localStorage.setItem("l1sset"+"-"+type, JSON.stringify(sset));
+					value = this.getAttribute("value");
+					(value == "reset") ? l1sset = null : l1sset = value
+					localStorage.setItem("l1sset"+"-"+type, JSON.stringify(l1sset));
 					updateData("size");
 				});
 
@@ -400,44 +409,44 @@
 							// 		.attr("cy", function(d) {
 							// 			return yScale(d[ycol]);
 							// 		})
-							// .attr("data-legend", function(d) { return d[cset]});
+							// .attr("data-legend", function(d) { return d[l1cset]});
 
 				// Refresh the scales
 				getColors = d3.scale.category10();
 				getClustSize = d3.scale.sqrt();
 				getShape = d3.scale.ordinal().range(["circle", "cross", "diamond", "square", "triangle-down", "triangle-up"]);
-				if (typeof sset !== "undefined" && typeof cset !== "undefined" && typeof shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
-					console.log("sset, shset and cset are not undefined")
-				} else if (typeof cset !== "undefined" && typeof sset == "undefined" && typeof shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", function(d) { return getColors(d[cset]); });
-				} else if (typeof cset !== "undefined" && typeof sset !== "undefined" && shset == "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
-				} else if (typeof cset == "undefined" && typeof sset !== "undefined" && shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
-				} else if (typeof sset  !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
-					console.log("sset is not undefined");
-				} else if (typeof cset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", function(d) { return getColors(d[cset]); });
-					console.log("cset is not undefined");
-				} else if (typeof shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", "#1f77b4");
-					console.log("shset is not undefined");
+				if (typeof l1sset !== "undefined" && typeof l1cset !== "undefined" && typeof l1shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", function(d) { return getColors(d[l1cset]); });
+					console.log("l1sset, l1shset and l1cset are not undefined")
+				} else if (typeof l1cset !== "undefined" && typeof l1sset == "undefined" && typeof l1shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); })).style("fill", function(d) { return getColors(d[l1cset]); });
+				} else if (typeof l1cset !== "undefined" && typeof l1sset !== "undefined" && l1shset == "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", function(d) { return getColors(d[l1cset]); });
+				} else if (typeof l1cset == "undefined" && typeof l1sset !== "undefined" && l1shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", "#1f77b4");
+				} else if (typeof l1sset  !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", "#1f77b4");
+					console.log("l1sset is not undefined");
+				} else if (typeof l1cset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", function(d) { return getColors(d[l1cset]); });
+					console.log("l1cset is not undefined");
+				} else if (typeof l1shset !== "undefined") {
+					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); })).style("fill", "#1f77b4");
+					console.log("l1shset is not undefined");
 				}
 
 				svg.selectAll("path").attr("data-legend", function(d) {
 					if (feature == "colour") {
-						return d[cset];
+						return d[l1cset];
 					} else if (feature == "shape") {
-						return d[shset];
+						return d[l1shset];
 					}
 				});
 
 				function createLegend(legendType) {
-					if (legendType == "cset") {
+					if (legendType == "l1cset") {
 						ypos = 30;
-					} else if (legendType == "shset") {
+					} else if (legendType == "l1shset") {
 						ypos = 100;
 					} else {
 						ypos = 30;
@@ -449,45 +458,47 @@
 						.call(d3.legend);
 				}
 
-				// if (cset !== "undefined" | shset !== "undefined") {
+				// if (l1cset !== "undefined" | l1shset !== "undefined") {
 				// 	createLegend();
 				// }
 
-				// if (cset !== "undefined" | shset !=="undefined") {
-				// 	createLegend("cset");
-				// 	createLegend("shset");
-				// } else if (cset !== "undefined") {
-				// 	createLegend("cset");
-				// } else if (shset !== "undefined") {
-				// 	createLegend("shset");
+				// if (l1cset !== "undefined" | l1shset !=="undefined") {
+				// 	createLegend("l1cset");
+				// 	createLegend("l1shset");
+				// } else if (l1cset !== "undefined") {
+				// 	createLegend("l1cset");
+				// } else if (l1shset !== "undefined") {
+				// 	createLegend("l1shset");
 				// }
 
 //				Update legend or append if not created yet after necessary (!) delay
-				if (typeof cset !== "undefined") {
+				if (typeof l1cset !== "undefined") {
 					setTimeout(function() {
 						if (typeof legend !== "undefined") {
 							legend.call(d3.legend)
 						} else {
 							legend = container.append("g")
 								.attr("class","legend")
-								.attr("transform","translate(500,30)")
+								.attr("transform","translate(480,30)")
 								.style("font-size","12px")
 								.call(d3.legend)
 						}
 					},100)
 				}
-				if (typeof shset !== "undefined") {
+				else if (typeof l1shset !== "undefined") {
 					setTimeout(function() {
 						if (typeof legend !== "undefined") {
 							legend.call(d3.legend)
 						} else {
 							legend = container.append("g")
 								.attr("class","legend")
-								.attr("transform","translate(500,100)")
+								.attr("transform","translate(480,100)")
 								.style("font-size","12px")
 								.call(d3.legend)
 						}
 					},100)
+				} else {
+					d3.select(".legend").remove();
 				}
 				svg.call(zoom);
 			}

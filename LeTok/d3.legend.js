@@ -23,7 +23,7 @@ d3.legend = function(g) {
         items[self.attr("data-legend")] = {
           pos : self.attr("data-legend-pos") || this.getBBox().y,
           color : self.attr("data-legend-color") != undefined ? self.attr("data-legend-color") : self.style("fill") != 'none' ? self.style("fill") : self.style("stroke"),
-          shape : self.attr("data-legend-shape") != undefined ? self.attr("data-legend-shape") : self.attr("d") != "none" ? self.attr("d") : d3.svg.symbol().type(function(d) { return "circle"; })
+          shape : self.attr("data-legend-shape") != undefined ? self.attr("data-legend-shape") : self.attr("d") != "none" ? self.attr("d") : d3.svg.symbol().type("circle")
         }
       })
 
@@ -40,9 +40,17 @@ d3.legend = function(g) {
         .data(sortByKey(items, "key"))
         .call(function(d) { d.enter().append("text")})
         .call(function(d) { d.exit().remove()})
-        .attr("y",function(d,i) { return i+"em"})
-        .attr("x","1em")
+        .attr("y",function(d,i) { return (i+1)+"em"})
+        .attr("x", "1em")
+		.attr("font-weight", "normal")
         .text(function(d) { ;return d.key})
+
+// Append title to legend
+	li.append("text")
+		.attr("x", "-1em")
+		.attr("y", "0em")
+		.attr("font-weight", "bold")
+		.text(legendParam)
 
     function convert(i) {
       var result;
@@ -55,7 +63,7 @@ d3.legend = function(g) {
         .call(function(d) { d.enter().append("path")})
 		.classed("immutable", true)
         .call(function(d) { d.exit().remove()})
-        .attr("transform", function(d,i) { return "translate(0," + convert(i) + ")"; })
+        .attr("transform", function(d,i) { return "translate(0," + convert(i+1) + ")"; })
         // .attr("cy",function(d,i) { return i-0.25+"em"})
         // .attr("cx",0)
         // .attr("r","0.4em")

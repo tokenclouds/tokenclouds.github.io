@@ -107,13 +107,13 @@
 
 			var type = getUrlParameter("type");
 
-			var cset = (localStorage.getItem("cset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("cset"+"-"+type)));
-			var shset = (localStorage.getItem("shset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("shset"+"-"+type)));
-			var sset = (localStorage.getItem("sset"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("sset"+"-"+type)));
+			var cset = (localStorage.getItem("cset"+"-"+type == null) ? undefined : JSON.parse(localStorage.getItem("cset"+"-"+type)));
+			var shset = (localStorage.getItem("shset"+"-"+type == null) ? undefined : JSON.parse(localStorage.getItem("shset"+"-"+type)));
+			var sset = (localStorage.getItem("sset"+"-"+type == null) ? undefined : JSON.parse(localStorage.getItem("sset"+"-"+type)));
 			var mset;
 			var legendParam;
 
-			var selection = (localStorage.getItem("selection"+"-"+type == (undefined || null)) ? [] : JSON.parse(localStorage.getItem("selection"+"-"+type)));
+			var selection = (localStorage.getItem("selection"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("selection"+"-"+type)));
 			var goToPlot;
 			d3.selection.prototype.moveToFront = function() {
 				return this.each(function(){
@@ -206,6 +206,21 @@
 										.attr("value", function(d) { return d; })
 										.text(function (d) { return d; });
 
+			// Add a "reset" option
+			function addReset(selector, reference) {
+				d3.select(selector)
+					.append("li")
+					.append("a")
+					.attr("class", reference)
+					.attr("xlink:href", "#")
+					.attr("value", "reset")
+					.text("Reset");
+			}
+
+			addReset("#size", "siz");
+			addReset("#shape", "shape");
+			addReset("#colour", "col");
+
 			//Create scale functions
 			var xScale = d3.scale.linear()
 								 .domain([d3.min(dataset, function(d) { return +d[xcol]; }) * 1.1, d3.max(dataset, function(d) { return +d[xcol]; }) * 1.1])
@@ -290,7 +305,7 @@
 //				 .attr("r", 5)
 				.style("fill", function(d) { (cset === (undefined || null)) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
 				.classed("selected", function(d) {
-					if (selection) {
+					if (selection && selection.length > 0) {
 						return !(selection.indexOf(d["_id"]) > -1);
 					}
 				 })
@@ -345,7 +360,7 @@
 			});
 
 			svg.selectAll("path").attr("data-legend", function (d) {
-				if (cset !== "undefined") {
+				if (cset !== null) {
 					return d[cset];
 				} else if (shset !== "shape") {
 					return d[shset];
@@ -362,7 +377,7 @@
 					.call(d3.legend);
 			}
 
-			if (cset !== "undefined" | shset !== "undefined") {
+			if (cset !== null | shset !== null) {
 				createLegend();
 			}
 
@@ -380,9 +395,11 @@
 
  				//On menu change, update colour and/or size
 				d3.selectAll(".col").on("click", function() {
-					cset = this.getAttribute("value");
-					if (colnames.indexOf(cset) === -1) {
-						cset = mset + "." + this.getAttribute("value");
+					value = this.getAttribute("value");
+					console.log(value);
+					(value == "reset") ? cset = null : cset = value
+					if (colnames.indexOf(cset) === -1 && cset !== null) {
+						cset = mset + "." + value;
 					}
 					localStorage.setItem("cset"+"-"+type, JSON.stringify(cset));
 					legendParam = cset;
@@ -390,9 +407,10 @@
 				});
 
 				d3.selectAll(".shape").on("click", function() {
-					shset = this.getAttribute("value");
-					if (colnames.indexOf(shset) === -1) {
-						shset = mset + "." + this.getAttribute("value");
+					value = this.getAttribute("value");
+					(value == "reset") ? shset = null : shset = value
+					if (colnames.indexOf(shset) === -1 && shset !== null) {
+						shset = mset + "." + value;
 					}
 					localStorage.setItem("shset"+"-"+type, JSON.stringify(shset));
 					legendParam = shset;
@@ -400,11 +418,12 @@
 				});
 
 				d3.selectAll(".siz").on("click", function() {
-					sset = this.getAttribute("value");
+					value = this.getAttribute("value");
+					(value == "reset") ? sset = null : sset = value
 					localStorage.setItem("sset"+"-"+type, JSON.stringify(sset));
 					//To switch between levels, size needs to be saved to localStorage without model specification
-					if (colnames.indexOf(sset) === -1) {
-						sset = mset + "." + this.getAttribute("value");
+					if (colnames.indexOf(sset) === -1 && sset !== null) {
+						sset = mset + "." + value;
 					}
 					updateVisFeat("size");
 				});
@@ -449,11 +468,9 @@
 							// 		.attr("cy", function(d) {
 							// 			return yScale(d[ycol]);
 							// 		})
-							.attr("transform", function(d) { return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")"; })
-							// .attr("d", d3.svg.symbol().type(function(d) { return (shset == "undefined") ? getShape(d[shset]) : "circle"; }))
+							.attr("transform", function(d) { return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")"; console.log(d[xcol]);})
+							// .attr("d", d3.svg.symbol().type(function(d) { return (shset == null) ? getShape(d[shset]) : "circle"; }))
 							//.attr("data-legend", function(d) { return d[cset]});
-
-							console.log((shset == "undefined") ? getShape(d[shset]) : "circle");
 				}
 
 				function updateVisFeat(feature, set) {
@@ -462,24 +479,27 @@
 							getClustSize = d3.scale.sqrt();
 							getShape = d3.scale.ordinal().range(["circle", "cross", "diamond", "square", "triangle-down", "triangle-up"]);
 
-						 	if (typeof sset !== "undefined" && typeof cset !== "undefined" && typeof shset !== "undefined") {
+						 	if (sset !== null && cset !== null && shset !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
 								console.log("sset, shset and cset are not undefined")
-							} else if (typeof cset !== "undefined" && typeof sset == "undefined" && typeof shset !== "undefined") {
+							} else if (cset !== null && sset == null && shset !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", function(d) { return getColors(d[cset]); });
-							} else if (typeof cset !== "undefined" && typeof sset !== "undefined" && shset == "undefined") {
+							} else if (cset !== null && sset !== null && shset == null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", function(d) { return getColors(d[cset]); });
-							} else if (typeof cset == "undefined" && typeof sset !== "undefined" && shset !== "undefined") {
+							} else if (cset == null && sset !== null && shset !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
-							} else if (typeof sset  !== "undefined") {
+							} else if (sset  !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[sset])*32; })).style("fill", "#1f77b4");
 								console.log("sset is not undefined");
-							} else if (typeof cset !== "undefined") {
+							} else if (cset !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", function(d) { return getColors(d[cset]); });
 								console.log("cset is not undefined");
-							} else if (typeof shset !== "undefined") {
+							} else if (shset !== null) {
 								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[shset]); })).style("fill", "#1f77b4");
 								console.log("shset is not undefined");
+							} else {
+								svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", "#1f77b4");
+								console.log("everything is undefined")
 							}
 
 							svg.selectAll("path").attr("data-legend", function(d) {
@@ -491,9 +511,9 @@
 							});
 
 							//Update legend or append if not created yet after necessary (!) delay
-							if (typeof cset !== "undefined" || shset !== "undefined") {
+							if (cset !== null || shset !== null) {
 								setTimeout(function() {
-									if (typeof legend !== "undefined") {
+									if (typeof(legend) !== "undefined") {
 										legend.call(d3.legend)
 									} else {
 											legend = container.append("g")
@@ -503,6 +523,8 @@
 												.call(d3.legend)
 											}
 								},100)
+							} else {
+								d3.select(".legend").remove();
 							}
 
 							svg.call(zoom);
