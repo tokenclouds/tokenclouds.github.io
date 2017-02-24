@@ -253,6 +253,8 @@
 
 			//Create SVG element
 			var svg = d3.select("body")
+						.append("div")
+						.attr("class", "container")
 						.append("svg")
 						.attr("width", w)
 						.attr("height", h)
