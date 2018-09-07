@@ -2,17 +2,20 @@
 <html lang="en">
 	<head>
     <meta charset="utf-8">
-    <title>Scatterplot matrix</title>
+    <title></title>
     <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
     <script src="d3.legend.js"></script>
     <script type="text/javascript" src="https://code.jquery.com/jquery-latest.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+		<script src="js/bootstrap.min.js"></script>
+		<link rel="stylesheet" href="css/bootstrap.min.css">
+	  <script src="//cdn.datatables.net/1.10.15/js/jquery.dataTables.min.js"></script>
+	  <link rel="stylesheet" href="//cdn.datatables.net/1.10.15/css/jquery.dataTables.min.css">
+	  <script src="//cdn.datatables.net/1.10.15/js/dataTables.bootstrap.min.js"></script>
 
     <style type="text/css">
 svg {
   font: 10px sans-serif;
-  padding: 10px;
+  padding: 5px;
 }
 
 .axis,
@@ -62,7 +65,6 @@ path.selected {
 
 div {
   float: left;
-  margin-right: 10px;
 }
 
 .legend rect {
@@ -75,19 +77,24 @@ div {
 </head>
 
 <div id="wrap">
-  <div>
-  	<button type="button" class="btn btn-default" id="clear-select">Clear item selection</button>
-  </div>
-  <div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select colour<span class="caret"></span></button>
-	  <ul class="dropdown-menu" id="colour"></ul>
-  </div>
-  <div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select shape<span class="caret"></span></button>
-	  <ul class="dropdown-menu" id="shape"></ul>
-  </div>
-  <div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select size<span class="caret"></span></button>
-	  <ul class="dropdown-menu" id="size"></ul>
-  </div>
-</div>
+	<div><button type="button" class="btn btn-default" id="update-select">Update model selection</button></div>
+	<div><button type="button" class="btn btn-default" id="clear-select">Clear item selection</button></div>
+
+	<div>
+		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Goto model<span class="caret"></span></button>
+			<ul class="dropdown-menu" id="model"></ul>
+		</div>
+		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select colour<span class="caret"></span></button>
+	  		<ul class="dropdown-menu" id="colour"></ul>
+  		</div>
+  		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select shape<span class="caret"></span></button>
+	  		<ul class="dropdown-menu" id="shape"></ul>
+  		</div>
+  		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select size<span class="caret"></span></button>
+	  		<ul class="dropdown-menu" id="size"></ul>
+  		</div>
+	</div>
+</div
 
 <div id="wrap">
   <div>
@@ -100,9 +107,12 @@ div {
 </div>
 
 <div class="container">
-  <h2></h2>
-  <p></p>
+	<h2></h2>
+	<p></p>
 </div>
+
+<div id="plot"></div>
+<div id="tablecontainer"></div>
 
 <body>
 <script>
@@ -123,7 +133,7 @@ var getUrlParameter = function getUrlParameter(sParam) {
 
 var width = 2420,
     size = 375,
-    padding = 30;
+    padding = 50;
 
 var x = d3.scale.linear()
     .range([padding / 2, size - padding / 2]);
@@ -144,9 +154,10 @@ var yAxis = d3.svg.axis()
 var color = d3.scale.category10();
 
 // add the tooltip area to the webpage
-var tooltip = d3.select("body").append("div")
-    .attr("class", "tooltip")
-    .style("opacity", 0);
+var tooltip = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.style("opacity", 0);
 
 var brushCell;
 
@@ -157,7 +168,7 @@ var shset = (localStorage.getItem("shset"+"-"+type == null) ? [] : JSON.parse(lo
 var sset = (localStorage.getItem("sset"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("sset"+"-"+type)));
 
 var modselection = JSON.parse(localStorage.getItem("modselection"+"-"+type));
-var goToPlot = JSON.parse(localStorage.getItem("modselection"+"-"+type))[0];
+var goToPlot = (modselection == null) ? undefined : modselection[0];
 var selection = (localStorage.getItem("selection"+"-"+type == null) ? [] : JSON.parse(localStorage.getItem("selection"+"-"+type)));
 
 var dataset;
@@ -171,6 +182,11 @@ d3.tsv(type+".tsv", function(error, data) {
   d3.select("body").select("h2").text("Level 2: " + type);
   d3.select("body").select("p").append("a").attr("href", "level1.html?type="+type).text("up ");
   d3.select("body").select("p").append("a").attr("href", "level3.html?type="+type).text(" down");
+
+	if (modselection == null) { //Stop loading the page if selection is empty.
+		window.alert("No models found in selection. Return to the previous level.");
+		return false;
+	}
 
 	colnames = d3.keys(data[0]);
 	othercols = colnames.filter(function(d) {return (!d.endsWith(".x") && !d.endsWith(".y"))});
@@ -234,6 +250,19 @@ d3.tsv(type+".tsv", function(error, data) {
 		.attr("value", function (d) { return d; })
 		.text(function (d) { return d; });
 
+	models = JSON.parse(localStorage.getItem("modselection"+"-"+type));
+	var modelDropDown = d3.select("#model")
+		.attr("name", "Model")
+		.selectAll("option")
+		.data(models)
+		.enter()
+		.append("li")
+		.append("a")
+		.attr("class", "mod")
+		.attr("xlink:href", "#")
+		.attr("value", function(d) { return d; })
+		.text(function (d) { return d; });
+
 	// Add a "reset" option
 	function addReset(selector, reference) {
 		d3.select(selector)
@@ -248,19 +277,6 @@ d3.tsv(type+".tsv", function(error, data) {
 	addReset("#size", "siz");
 	addReset("#shape", "shape");
 	addReset("#colour", "col");
-
-	var modelDropDown = d3.select("#model")
-		.attr("name", "Model")
-		.selectAll("option")
-		.data(models)
-		.enter()
-		.append("li")
-		.append("a")
-		.attr("class", "mod")
-		.attr("xlink:href", "#")
-		.attr("value", function(d) { return d.substring(0, d.length - 2); })
-		.text(function (d) { return d.substring(0, d.length - 2); });
-
 
 // Define the size of the matrix
       n = 3;
@@ -280,11 +296,12 @@ d3.tsv(type+".tsv", function(error, data) {
           .on("brush", brushmove)
           .on("brushend", brushend);
 
-      var svg = d3.select("body").append("svg")
-	     .attr("width", size * n + padding)
-	     .attr("height", size * n + padding)
-	     .append("g")
-	     .attr("transform", "translate(" + padding + "," + padding / 2 + ")");
+	var svg = d3.select("#plot")
+		.append("svg")
+		.attr("width", size * n + padding)
+		.attr("height", size * n + padding)
+		.append("g")
+		.attr("transform", "translate(" + padding + "," + padding / 2 + ")");
 
       svg.selectAll(".x.axis")
       .data(modselection)
@@ -308,31 +325,46 @@ d3.tsv(type+".tsv", function(error, data) {
       .attr("transform", function(d) { return "translate(" + (n - +d.i - 1) * size + "," + +d.j * size + ")"; })
       .each(plot);
 
-  cell.append("foreignObject")
-  	.attr("x", size-padding-5)
-	.attr("y", padding/2)
-	.append("xhtml:body")
-	.html("<form><input type=checkbox id=check checked=true></form>")
-	.on("click", function(d,i) {
-		model = d.x.substring(0, d.x.length-2);
-		index = modselection.indexOf(model);
-		if (index == -1) {
-			modselection.push(model)
-		} else {
-			modselection.splice(index, 1)
-		}
-		localStorage.setItem("modselection"+"-"+type, JSON.stringify(modselection));
-	});
+	function appendForeignObject() {
+		cell.append("foreignObject") //Browser support can be sketchy. Tested with Chrome and Firefox.
+			.attr("x", size-padding-5)
+			.attr("y", padding/2+2)
+			.attr("width", 18)
+			.attr("height", 20)
+			.append("xhtml:body")
+			.html("<form><input type=checkbox id=check checked=true></form>")
+			.on("click", function(d,i) {
+				model = d.x.substring(0, d.x.length-2);
+				index = modselection.indexOf(model);
+				if (index == -1) {
+					modselection.push(model)
+				} else {
+					modselection.splice(index, 1)
+				}
+				localStorage.setItem("modselection"+"-"+type, JSON.stringify(modselection));
+				if (modselection.length == 0) {
+					localStorage.setItem("goToPlot"+"-"+type, "");
+				}
+		});
+	}
+
+			appendForeignObject();
 
 // Titles for all plots.
   cell.append("text")
-    .attr("x", padding)
-    .attr("y", padding)
+    .attr("x", padding-20)
+    .attr("y", padding-20)
     .attr("dy", ".71em")
     .text(function(d) { if (d.x.substring(0, d.x.length-2) != "undefined") { return d.x.substring(0, d.x.length-2); }})
 //    .on('click', function(d) {console.log(d.x.substring(0, d.x.length-2));});
     .on('click', function(d) {
-      localStorage.setItem("goToPlot"+"-"+type, d.x.substring(0, d.x.length-2));
+	  model = d.x.substring(0, d.x.length-2);
+	  index = modselection.indexOf(model);
+	  if (index == -1) {
+		  modselection.push(model) // Make sure clicked model is in modselection even if it has been deselected before.
+		  localStorage.setItem("modselection"+"-"+type, JSON.stringify(modselection));
+	  }
+      localStorage.setItem("goToPlot"+"-"+type, model);
       window.location = "level3.html?type="+type;
     });
 
@@ -367,9 +399,13 @@ d3.tsv(type+".tsv", function(error, data) {
     selection = []
     localStorage.setItem("selection"+"-"+type, JSON.stringify(selection));
     svg.selectAll(".selected").classed("selected", false);
-    d3.selectAll('input').property('checked', false);
+    //d3.selectAll('input').property('checked', false);
     clickSelect = false;
   });
+
+	d3.select("#update-select").on("click", function() {
+		location.reload()
+	});
 
   d3.selectAll(".col").on("click", function() {
 	  value = this.getAttribute("value");
@@ -391,6 +427,12 @@ d3.tsv(type+".tsv", function(error, data) {
 	localStorage.setItem("sset"+"-"+type, JSON.stringify(sset));
 	updatePlots();
   });
+
+	d3.selectAll(".mod").on("click", function() {
+		localStorage.setItem("goToPlot"+"-"+type, this.getAttribute("value"));
+		console.log(this.getAttribute("value"));
+		window.location = "level3.html?type="+type;
+	});
 
   //Create color scale
   var getColors = d3.scale.category10();
@@ -430,7 +472,7 @@ d3.tsv(type+".tsv", function(error, data) {
 			.type(function (d) { (shset === (undefined || null)) ? out="circle" : out=getShape(d[shset]); return out; })
 			.size(function (d) { (sset === (undefined || null)) ? out=64 : out=getClustSize(+d[p.mod+"."+sset])*32; return out; }))
 //		.attr("d", d3.svg.symbol("circle"))
-		.style("fill", function(d) { (cset === (undefined || null)) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
+		  .style("fill", function(d) { (cset === (undefined || null)) ? out="#1f77b4" : out=getColors(d[cset]); return out; })
         .classed("selected", function(d) {
             if (selection.length > 0) {
              return !(selection.indexOf(d["_id"]) > -1);
@@ -523,9 +565,12 @@ d3.tsv(type+".tsv", function(error, data) {
 	        .attr("transform", function(d) { return "translate(" + (n - +d.i - 1) * size + "," + +d.j * size + ")"; })
 	        .each(plot);
 
+		//appendForeignObject();
 		cell.append("foreignObject")
 			.attr("x", size-padding-5)
-	  		.attr("y", padding/2)
+			.attr("y", padding/2+2)
+			.attr("width", 18)
+			.attr("height", 20)
 	  		.append("xhtml:body")
 	  		.html("<form><input type=checkbox id=check checked=true></form>")
 	  		.on("click", function(d,i) {
@@ -537,6 +582,9 @@ d3.tsv(type+".tsv", function(error, data) {
 	  				modselection.splice(index, 1)
 	  			}
 	  			localStorage.setItem("modselection"+"-"+type, JSON.stringify(modselection));
+					if (modselection.length == 0) {
+						localStorage.setItem("goToPlot"+"-"+type, "");
+					}
 	  		});
 
 		cell.append("text")
@@ -735,6 +783,42 @@ d3.tsv(type+".tsv", function(error, data) {
 
   d3.select(self.frameElement).style("height", size * n + padding + 20 + "px");
 
-});
+  d3.tsv(type+".models.tsv", function(error, data) {
+  	mdata = data.filter(function(d) {return (modselection.indexOf(d._id) > -1)})
+  	colnames = d3.keys(mdata[0]);
+  	othercols = colnames.filter(function(d) {return (!d.endsWith(".x") && !d.endsWith(".y"))});
+  	console.log(mdata);
 
+  	var table = d3.select("#tablecontainer")
+  					.append("table")
+  					.attr("id", "dataframe")
+  					.attr("class", "table table-striped table-bordered")
+  					.attr("cellspacing", "0")
+  					.attr("width", "150%")
+  					.append("thead")
+  					.selectAll("tr")
+  					.data(mdata)
+  					.enter();
+  //					.text(function (d) { return d; });
+
+  	$(document).ready(function() {
+  		tableContent = $('#dataframe').DataTable( {
+  			select : true,
+  			"aaData" : mdata,
+				"aaSorting" : [],
+  			"aoColumns": [
+  				{ mDataProp: "_id", title: "ID"  },
+					{ mDataProp: "weighted", title: "weighted" },
+  				{ mDataProp: "first-order weighting", title: "first-order weighting"},
+  				{ mDataProp: "context window size", title: "context window size"},
+  				{ mDataProp: "second-order window size", title: "second-order window size"},
+  				{ mDataProp: "second-order scheme", title: "second-order scheme"},
+  				{ mDataProp: "MDS stress", title: "MDS stress"},
+  				{ mDataProp: "Same Class Path ratio", title: "Same Class Path ratio"}
+  			]
+  		});
+  	})
+  })
+
+});
 </script>

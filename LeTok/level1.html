@@ -3,14 +3,18 @@
 	<head>
 		<meta charset="utf-8">
 		<title>Model selection</title>
-		<script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-		<script src="d3.legend.js"></script>
-		<script type="text/javascript" src="https://code.jquery.com/jquery-latest.min.js"></script>
-		<script src="//cdn.datatables.net/1.10.12/js/jquery.dataTables.min.js"></script>
-		<link rel="stylesheet" href="//cdn.datatables.net/1.10.12/css/jquery.dataTables.min.css">
-		<link rel="stylesheet" href="//cdn.datatables.net/1.10.12/css/dataTables.bootstrap.min.css">
-		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
-		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+		<script src="js/d3.min.js"></script>
+		<script src="js/d3-legend.min.js"></script>
+		<script src="js/jquery-3.2.1.min.js"></script>
+		<script src="js/bootstrap.min.js"></script>
+		<script src="js/jquery.dataTables.min.js"></script>
+		<script src="js/dataTables.bootstrap.min.js"></script>
+		<script src="js/fnFindCellRowIndexes.js"></script>
+
+		<link rel="stylesheet" href="css/bootstrap.min.css">
+		<link rel="stylesheet" href="css/jquery.dataTables.min.css">
+
 		<style type="text/css">
 			.axis path,
 			.axis line {
@@ -45,20 +49,33 @@
 			}
 
 			div {
-    		float: left;
+    			float: left;
 			}
 
 			.legend rect {
-  			fill:white;
-  			stroke:black;
-  			opacity:0.8;}
+				fill:white;
+				stroke:black;
+				opacity:0.8;
+			}
 		</style>
 	</head>
 
 	<div id="wrap">
-		<div><button type="button" class="btn btn-default" id="memory-clear">Clear memory</button></div>
-		<div><button type="button" class="btn btn-default" id="clear-select">Clear selection</button></div>
-		<div><button type="button" class="btn btn-default" id="confirm-select">Confirm selection</button></div>
+		<div><button type="button" class="btn btn-default" id="memory-clear">Reset</button></div>
+		<div><button type="button" class="btn btn-default" id="clear-select">Clear model selection</button></div>
+		<div><button type="button" class="btn btn-default" id="confirm-select">Confirm model selection</button></div>
+		<div><button type="button" class="btn btn-default" id="download-localstorage">Download state</button></div>
+
+		<div>
+			<div class="dropdown">
+				<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">X-axis data<span class="caret"></span></button>
+				<ul class="dropdown-menu" id="xdata"></ul>
+			</div>
+			<div class="dropdown">
+				<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Y-axis data<span class="caret"></span></button>
+				<ul class="dropdown-menu" id="ydata"></ul>
+			</div>
+		</div>
 
 		<div>
 		<div class="dropdown"><button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown">Select colour<span class="caret"></span></button>
@@ -116,6 +133,13 @@
 
 			var type = getUrlParameter("type");
 
+			// Initialising variables to store the axes variables
+			var xvalue = "model.x";
+			var yvalue = "model.y";
+			var xset = xvalue; //= localStorage.getItem("xset"+"-"+type) == null ? goToPlot + ".x" : JSON.parse(localStorage.getItem("xset"+"-"+type));
+			var yset = yvalue; //= localStorage.getItem("yset"+"-"+type) == null ? goToPlot + ".y" : JSON.parse(localStorage.getItem("yset"+"-"+type));
+
+
 			var l1cset = (localStorage.getItem("l1cset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1cset"+"-"+type));
 			var l1shset = (localStorage.getItem("l1shset"+"-"+type) == null) ? undefined : JSON.parse(localStorage.getItem("l1shset"+"-"+type));
 			var l1sset = (localStorage.getItem("l1sset"+"-"+type) == null) ? undefined  : JSON.parse(localStorage.getItem("l1sset"+"-"+type));
@@ -141,13 +165,45 @@
 			firstRow = d3.entries(dataset[1]).filter(function(d) { if (othercols.indexOf(d.key) >= 0) {return d.value;}; });
 			models = d3.entries(dataset).filter(function (d) {return d["_id"]});
 
-		  function isNumber(obj) { return !isNaN(parseFloat(obj)) }
+			function isNumber(obj) { return !isNaN(parseFloat(obj)) }
 
 			nominals = firstRow.filter(function(d) { if (!isNumber(d.value) && !d.key.startsWith("_")) { return d.key; } });
+
 			numericals = firstRow.filter(function(d) { if (isNumber(d.value)) { return d.key; } });
-			console.log(firstRow)
+			var numSet = new Set();
+			// Text description of the first and second dimension as numerical variable
+			const firstAndSecondDimNames = ["first dimension", "second dimension"]
+			firstAndSecondDimNames.forEach(function (d) { numSet.add(d); })
+			numericals.forEach(function (d) { numSet.add(new RegExp("([^.]+)$").exec(d.key)[0]); });
+
+			console.log(numSet)
 			// colours = ["wWindow", "wScheme"];
 			// size = ["windowSize", "MDSstress"];
+
+			// Dropdown menus for axes data
+			var xAxisDropDown = d3.select("#xdata")
+									.attr("name", "X-axis data")
+									.selectAll("option")
+									.data(Array.from(numSet))
+									.enter()
+									.append("li")
+									.append("a")
+									.attr("class", "xdata")
+									.attr("xlink:href", "#")
+									.attr("value", function(d) { return d; })
+									.text(function (d) {return d; });
+
+			var yAxisDropDown = d3.select("#ydata")
+									.attr("name", "Y-axis data")
+									.selectAll("option")
+									.data(Array.from(numSet))
+									.enter()
+									.append("li")
+									.append("a")
+									.attr("class", "ydata")
+									.attr("xlink:href", "#")
+									.attr("value", function(d) { return d; })
+									.text(function (d) {return d; });
 
 			// Create selection menu for colour-coding
 			var colourDropDown = d3.select("#colour")
@@ -202,33 +258,28 @@
 			addReset("#colour", "col");
 
 			//Create scale functions
-			var xScale = d3.scale.linear()
+			var xScale = d3.scaleLinear()
 								 .domain([d3.min(dataset, function(d) { return +d[xcol]; }) * 1.1, d3.max(dataset, function(d) { return +d[xcol]; }) * 1.1])
 								 .range([padding, w - padding * 2]);
 
-			var yScale = d3.scale.linear()
+			var yScale = d3.scaleLinear()
 								 .domain([d3.min(dataset, function(d) { return +d[ycol]; }) * 1.1, d3.max(dataset, function(d) { return +d[ycol]; }) * 1.1])
 								 .range([h - padding, padding]);
 
 			//Define X axis
-			var xAxis = d3.svg.axis()
-							  .scale(xScale)
-							  .orient("bottom")
-							  .ticks(10)
-							  .outerTickSize(0);
+			var xAxis = d3.axisBottom(xScale)
+							.ticks(10)
+							.tickSizeOuter(0);
 
 			//Define Y axis
-			var yAxis = d3.svg.axis()
-							  .scale(yScale)
-							  .orient("left")
+			var yAxis = d3.axisLeft(yScale)
 							  .ticks(10)
-							  .outerTickSize(0);
+							  .tickSizeOuter(0);
 
 			//Zoom
-			var zoom = d3.behavior.zoom()
+			var zoom = d3.zoom()
 						.scaleExtent([0, 10])
-						.x(xScale)
-						.y(yScale)
+						.translateExtent([[-100, -100], [w + 90, h + 100]])
 						.on("zoom", zoomed);
 
 			//Create SVG element
@@ -250,13 +301,14 @@
 			var container = svg.append("g");
 
 			//Create color scale
-			var getColors = d3.scale.category10();
+			var getColors = d3.scaleOrdinal(d3.schemeCategory10);
 
 			//Create dot size scale
-			var getClustSize = d3.scale.sqrt();
+			//var getClustSize = d3.scaleSqrt()
+			var getClustSize = d3.scaleLinear();
 
 			//Create shape scale
-			var getShape = d3.scale.ordinal().range(["cross", "diamond", "square", "triangle-down", "triangle-up"]);
+			var getShape = d3.scaleOrdinal(["cross", "diamond", "square", "triangle-down", "triangle-up"]);
 
 			dot = container.append("g")
 				.attr("class", "dot")
@@ -265,7 +317,7 @@
 				.enter()
 				.append("path")
 				.attr("transform", function(d) { return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")"; })
-				.attr("d", d3.svg.symbol().type("circle"))
+				.attr("d", d3.symbol().type(d3.symbolWye))
 			//    .attr("cx", function(d) {
 			//    		return xScale(+d[xcol]);
 			//    })
@@ -273,18 +325,18 @@
 			//    		return yScale(+d[ycol]);
 			//    })
 			// 	 .attr("r", 5)
-				.style("fill", function(d) { (l1cset === "undefined") ? out="#1f77b4" : out=getColors(d[l1cset]); return out; })
+				.style("fill", function(d) { (l1cset === undefined) ? out="#1f77b4" : out=getColors(d[l1cset]); return out; })
 				.classed("selected", function(d) {
 					if (selection.length > 0) {
 						return !(selection.indexOf(d["_id"]) > -1);
 					}
 				 })
-				 .attr("data-legend", " ")
+//				 .attr("data-legend", " ")
       	 .on("mouseover", function(d) {
           		tooltip.transition()
 					.duration(200)
 					.style("opacity", .9);
-          		tooltip.html("<b>" + d["_id"] + "</b>" + (typeof l1sset  !== "undefined" ? "<p><b>"+l1sset+"</b>: " + d[l1sset] : "" ))
+          		tooltip.html("<b>" + d["_id"] + "</b>" + (typeof l1sset  !== "undefined" ? "<p><b>"+l1sset+"</b>: " + d3.format(".3n")(d[l1sset]) : "" ))
 					.style("left", (d3.event.pageX + 20) + "px")
 					.style("top", (d3.event.pageY - 28) + "px");
 //				svg.select(".dot").selectAll("circle").style("opacity", .2);
@@ -293,10 +345,10 @@
 					.append("path")
 					.classed("selector", true)
 					.attr("transform", d3.select(this).attr("transform"))
-					.attr("d", d3.svg.symbol().type("circle").size(this.getTotalLength()+200))
+					.attr("d", d3.symbol().type(d3.symbolCircle).size(this.getTotalLength()+80))
 					.attr("fill", "none")
 					.attr("stroke", "red")
-					.attr("stroke-width", 3);
+					.attr("stroke-width", 2);
       		})
       		.on("mouseout", function(d) {
           		tooltip.transition()
@@ -323,6 +375,10 @@
 									selection.splice(index, 1);
 								}
 							}
+							// Make the dataTables interaction happen
+							var tableIndex = $('#dataframe').dataTable().fnFindCellRowIndexes(d["_id"], 0);
+							$(tableContent.row(tableIndex).node()).toggleClass("selected");
+
 							if (selection.length > 0) {
 								svg.select(".dot").selectAll("path:not(.selector)").classed("selected", function(d) {
 									return !(selection.indexOf(d["_id"]) > -1);
@@ -342,6 +398,49 @@
 				.attr("class", "y axis")
 				.attr("transform", "translate(" + padding + ",0)")
 				.call(yAxis);
+
+			//Create the legends if required
+			var legendOrdinalColor = d3.legendColor()
+				.shape("path", d3.symbol().type(d3.symbolWye).size(150)())
+				.shapePadding(10)
+				.scale(getColors);
+			var legendOrdinalShape = d3.legendSymbol()
+				.shapePadding(10)
+				.scale(getShape);
+			if (typeof(l1cset) !== "undefined") {
+				svg.select(".legendOrdinalColor")
+					.call(legendOrdinalColor);
+			} if (typeof(l1shset) !== "undefined") {
+				svg.select(".legendOrdinalShape")
+					.call(legendOrdinalShape);
+			}
+
+			//On menu change plot new data
+			d3.selectAll(".xdata").on("click", function() {
+				xvalue = this.getAttribute("value");
+				if (xvalue == "first dimension") {
+					xset = "model.x";
+				} else if (xvalue == "second dimension") {
+					xset = "model.y";
+				} else {//if (colnames.indexOf(xset) === -1 && xset !== null) {
+					xset = xvalue;
+				}
+				//localStorage.setItem("xset"+"-"+type, JSON.stringify(xset));
+				updateXaxis();
+			});
+
+			d3.selectAll(".ydata").on("click", function() {
+				yvalue = this.getAttribute("value");
+				if (yvalue == "first dimension") {
+					yset = "model.x";
+				} else if (yvalue == "second dimension") {
+					yset = "model.y";
+				} else  {//if (colnames.indexOf(yset) === -1 && yset !== null) {
+					yset = yvalue;
+				}
+				//localStorage.setItem("yset"+"-"+type, JSON.stringify(yset));
+				updateYaxis();
+			});
 
  				//On menu change, update colour and/or size
 				d3.selectAll(".col").on("click", function() {
@@ -376,6 +475,7 @@
  					selection = []
  					localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
  					svg.selectAll(".selected").classed("selected", false);
+					tableContent.deselectAll();
  				});
 
 				d3.select("#confirm-select").on("click", function() {
@@ -383,7 +483,38 @@
 					window.location = "level2.html?type="+type;
  				});
 
+				d3.select("#download-localstorage").on("click", function() {
+					console.save(localStorage, "tokenclouds" + Date.now() + ".txt");
+				});
+
+				function updateXaxis(){
+					//Rescale and redraw the axis
+					xScale.domain([d3.min(dataset, function(d) { return +d[xset]; }) * 1.1, d3.max(dataset, function(d) { return +d[xset]; }) * 1.1])
+					svg.select("g.x.axis").call(xAxis.scale(xScale));
+
+					//Put x-axis label
+					container.select("text")
+						.attr("class", "x label")
+						.attr("transform", "translate(" + (w-padding-80) + " ," + (h-padding-20) + ")")
+						.style("text-anchor", "right")
+						.style("font-size", "10px")
+						.style("font-weight", "bold")
+						.text(xvalue);
+					updateData();
+				}
+
+				function updateYaxis(){
+					svg.select("text")
+						.attr("transform", "rotate(270)")
+						.style("font-size", "10px")
+						.style("font-weight", "bold")
+						.text(yvalue);
+					updateData();
+				}
+
 				function updateData(feature) {
+					svg.selectAll(".legendCells").remove();
+
 				// 		//Update scale domains
 				// 		xScale.domain([d3.min(dataset, function(d) { return +d[xcol]; }) * 1.1, d3.max(dataset, function(d) { return +d[xcol]; }) * 1.1]);
 				// 		yScale.domain([d3.min(dataset, function(d) { return +d[ycol]; }) * 1.1, d3.max(dataset, function(d) { return +d[ycol]; }) * 1.1]);
@@ -412,36 +543,84 @@
 							// .attr("data-legend", function(d) { return d[l1cset]});
 
 				// Refresh the scales
-				getColors = d3.scale.category10();
-				getClustSize = d3.scale.sqrt();
-				getShape = d3.scale.ordinal().range(["circle", "cross", "diamond", "square", "triangle-down", "triangle-up"]);
+				getColors = d3.scaleOrdinal(d3.schemeCategory10);
+				getClustSize = d3.scaleLinear().range([0, 100]);
+				getShape = d3.scaleOrdinal([d3.symbolWye, d3.symbolCross, d3.symbolDiamond, d3.symbolSquare, d3.symbolTriangle, d3.symbolStar]);
+
 				if (typeof l1sset !== "undefined" && typeof l1cset !== "undefined" && typeof l1shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", function(d) { return getColors(d[l1cset]); });
+					getClustSize.domain([d3.min(dataset, function(d) { return +d[l1sset]; }), d3.max(dataset, function(d) { return +d[l1sset]; })]);
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(function(d) { return getShape(d[l1shset]); })
+						.size(function (d) { return getClustSize(+d[l1sset]); }))
+						.style("fill", function(d) { return getColors(d[l1cset]); })
 					console.log("l1sset, l1shset and l1cset are not undefined")
 				} else if (typeof l1cset !== "undefined" && typeof l1sset == "undefined" && typeof l1shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); })).style("fill", function(d) { return getColors(d[l1cset]); });
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(function(d) { return getShape(d[l1shset]); }))
+						.style("fill", function(d) { return getColors(d[l1cset]); })
 				} else if (typeof l1cset !== "undefined" && typeof l1sset !== "undefined" && l1shset == "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", function(d) { return getColors(d[l1cset]); });
+					getClustSize.domain([d3.min(dataset, function(d) { return +d[l1sset]; }), d3.max(dataset, function(d) { return +d[l1sset]; })]);
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(d3.symbolWye)
+						.size(function (d) { return getClustSize(+d[l1sset]); }))
+						.style("fill", function(d) { return getColors(d[l1cset]); })
 				} else if (typeof l1cset == "undefined" && typeof l1sset !== "undefined" && l1shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", "#1f77b4");
-				} else if (typeof l1sset  !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; }).size(function (d) { return getClustSize(+d[l1sset])*32; })).style("fill", "#1f77b4");
-					console.log("l1sset is not undefined");
+					getClustSize.domain([d3.min(dataset, function(d) { return +d[l1sset]; }), d3.max(dataset, function(d) { return +d[l1sset]; })]);
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(function(d) { return getShape(d[l1shset]); })
+						.size(function (d) { return getClustSize(+d[l1sset]); }))
+						.style("fill", "#1f77b4")
+				} else if (typeof l1sset !== "undefined") {
+					getClustSize.domain([d3.min(dataset, function(d) { return +d[l1sset]; }), d3.max(dataset, function(d) { return +d[l1sset]; })]);
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(d3.symbolWye)
+						.size(function (d) { return getClustSize(+d[l1sset]); }))
+						.style("fill", "#1f77b4")
+						console.log("l1sset is not undefined");
 				} else if (typeof l1cset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return "circle"; })).style("fill", function(d) { return getColors(d[l1cset]); });
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(d3.symbolWye))
+						.style("fill", function(d) { return getColors(d[l1cset]); })
 					console.log("l1cset is not undefined");
 				} else if (typeof l1shset !== "undefined") {
-					svg.select(".dot").selectAll("path:not(.immutable)").attr("d", d3.svg.symbol().type(function(d) { return getShape(d[l1shset]); })).style("fill", "#1f77b4");
+					svg.select(".dot").selectAll("path:not(.immutable)")
+						.attr("d", d3.symbol().type(function(d) { return getShape(d[l1shset]); }))
+						.style("fill", "#1f77b4")
 					console.log("l1shset is not undefined");
 				}
 
-				svg.selectAll("path").attr("data-legend", function(d) {
-					if (feature == "colour") {
-						return d[l1cset];
-					} else if (feature == "shape") {
-						return d[l1shset];
-					}
-				});
+				// svg.selectAll("path").attr("data-legend", function(d) {
+				// 	if (feature == "colour") {
+				// 		return d[l1cset];
+				// 	} else if (feature == "shape") {
+				// 		return d[l1shset];
+				// 	}
+				// });
+
+				//var legendOrdinalColor = d3.legendColor()
+				//	.shape("path", d3.symbol().type(d3.symbolWye).size(150)())
+				//	.shapePadding(10)
+				//	.scale(getColors);
+
+				var triangleU = d3.symbol().type(d3.symbolTriangle)(),
+					circle = d3.symbol().type(d3.symbolCircle)(),
+					cross = d3.symbol().type(d3.symbolCross)(),
+					diamond = d3.symbol().type(d3.symbolDiamond)(),
+					star = d3.symbol().type(d3.symbolStar)();
+
+				var symbolScale = d3.scaleOrdinal([triangleU, circle, cross, diamond, star]);
+
+				//var legendOrdinalShape = d3.legendSymbol()
+				//	.shapePadding(10)
+				//	.scale(getShape);
+
+				if (typeof(l1cset) !== "undefined") {
+					svg.select(".legendOrdinalColor")
+						.call(legendOrdinalColor);
+				} if (typeof(l1shset) !== "undefined") {
+					svg.select(".legendOrdinalShape")
+						.call(legendOrdinalShape);
+				}
 
 				function createLegend(legendType) {
 					if (legendType == "l1cset") {
@@ -458,62 +637,64 @@
 						.call(d3.legend);
 				}
 
-				// if (l1cset !== "undefined" | l1shset !== "undefined") {
+				// if (l1cset !== undefined | l1shset !== undefined) {
 				// 	createLegend();
 				// }
 
-				// if (l1cset !== "undefined" | l1shset !=="undefined") {
+				// if (l1cset !== undefined | l1shset !==undefined) {
 				// 	createLegend("l1cset");
 				// 	createLegend("l1shset");
-				// } else if (l1cset !== "undefined") {
+				// } else if (l1cset !== undefined) {
 				// 	createLegend("l1cset");
-				// } else if (l1shset !== "undefined") {
+				// } else if (l1shset !== undefined) {
 				// 	createLegend("l1shset");
 				// }
 
 //				Update legend or append if not created yet after necessary (!) delay
-				if (typeof l1cset !== "undefined") {
-					setTimeout(function() {
-						if (typeof legend !== "undefined") {
-							legend.call(d3.legend)
-						} else {
-							legend = container.append("g")
-								.attr("class","legend")
-								.attr("transform","translate(480,30)")
-								.style("font-size","12px")
-								.call(d3.legend)
-						}
-					},100)
-				}
-				else if (typeof l1shset !== "undefined") {
-					setTimeout(function() {
-						if (typeof legend !== "undefined") {
-							legend.call(d3.legend)
-						} else {
-							legend = container.append("g")
-								.attr("class","legend")
-								.attr("transform","translate(480,100)")
-								.style("font-size","12px")
-								.call(d3.legend)
-						}
-					},100)
-				} else {
-					d3.select(".legend").remove();
-				}
-				svg.call(zoom);
+				// if (typeof l1cset !== undefined) {
+				// 	setTimeout(function() {
+				// 		if (typeof legend !== undefined) {
+				// 			legend.call(d3.legend)
+				// 		} else {
+				// 			legend = container.append("g")
+				// 				.attr("class","legend")
+				// 				.attr("transform","translate(480,30)")
+				// 				.style("font-size","12px")
+				// 				.call(d3.legend)
+				// 		}
+				// 	},100)
+				// }
+				// else if (typeof l1shset !== undefined) {
+				// 	setTimeout(function() {
+				// 		if (typeof legend !== undefined) {
+				// 			legend.call(d3.legend)
+				// 		} else {
+				// 			legend = container.append("g")
+				// 				.attr("class","legend")
+				// 				.attr("transform","translate(480,100)")
+				// 				.style("font-size","12px")
+				// 				.call(d3.legend)
+				// 		}
+				// 	},100)
+				// } else {
+				// 	d3.select(".legend").remove();
+				// }
+//				svg.call(zoom);
 			}
 
 			function zoomed() {
 				svg.selectAll(".selector").remove();
-				svg.select("g.x.axis").call(xAxis);
-				svg.select("g.y.axis").call(yAxis);
+				svg.select("g.x.axis").call(xAxis.scale(d3.event.transform.rescaleX(xScale)));
+				svg.select("g.y.axis").call(yAxis.scale(d3.event.transform.rescaleY(yScale)));
 				svg.selectAll("path:not(.immutable)").attr("transform", transform);
 			}
 
 			function transform(d) {
 				// Dirty fix for empty path element
-				if (d !== 0) {
-					return "translate(" + xScale(d[xcol]) + "," + yScale(d[ycol]) + ")";
+				if (d !== null) {
+					new_xScale = d3.event.transform.rescaleX(xScale);
+					new_yScale = d3.event.transform.rescaleY(yScale);
+					return "translate(" + new_xScale(d[xcol]) + "," + new_yScale(d[ycol]) + ")";
 				}
 			}
 
@@ -524,30 +705,83 @@
 							.attr("id", "dataframe")
 							.attr("class", "table table-striped table-bordered")
 							.attr("cellspacing", "0")
-							.attr("width", "100%")
+							.attr("width", "150%")
 							.append("thead")
 							.selectAll("tr")
 							.data(othercols)
-							.enter()
-							.append("th")
-							.text(function (d) { return d; });
+							.enter();
+//							.text(function (d) { return d; });
 
 			$(document).ready(function() {
-				$('#dataframe').DataTable( {
+				tableContent = $('#dataframe').DataTable( {
+					select : true,
 					"aaData" : dataset,
 					"aoColumns": [
-						{ mDataProp: "_id" },
-						{ mDataProp: "FirstOrderWeighting"},
-						{ mDataProp: "BNCweighting" },
-						{ mDataProp: "contextWindow" },
-						{ mDataProp: "SecondOrderWindow" },
-						{ mDataProp: "SecondOrderScore" },
-						{ mDataProp: "stress"}
+						{ mDataProp: "_id", title: "ID"  },
+						{ mDataProp: "weighted", title: "weighted" },
+						{ mDataProp: "first-order weighting", title: "first-order weighting"},
+						{ mDataProp: "context window size", title: "context window size"},
+						{ mDataProp: "second-order window size", title: "second-order window size"},
+						{ mDataProp: "second-order scheme", title: "second-order scheme"},
+						{ mDataProp: "MDS stress", title: "MDS stress"},
+						{ mDataProp: "Same Class Path ratio", title: "Same Class Path ratio"}
 					]
 				});
-			});
 
+			$('#dataframe tbody').on('click', 'tr', function () {
+        		$(this).toggleClass('selected');
+						selectionID = tableContent.row(this).data()["_id"];
+						if (selection.indexOf(selectionID) === -1) {
+							selection.push(selectionID);
+						} else {
+							var index = selection.indexOf(selectionID);
+							if (index > -1) {
+								selection.splice(index, 1);
+							}
+						}
+
+						if (selection.length > 0) {
+							svg.select(".dot").selectAll("path:not(.selector)").classed("selected", function(d) {
+								return !(selection.indexOf(d["_id"]) > -1);
+							})
+						}
+				//updateData();
+						console.log( tableContent.row( this ).data()["_id"] );
+						localStorage.setItem("modselection"+"-"+type, JSON.stringify(selection));
+    	});
+
+			tableContent.deselectAll = function () {
+				$('#dataframe tbody tr').removeClass('selected');
+			}
+		});
 	});
+
+	(function(console){
+
+	    console.save = function(data, filename){
+
+	        if(!data) {
+	            console.error('Console.save: No data')
+	            return;
+	        }
+
+	        if(!filename) filename = 'console.json'
+
+	        if(typeof data === "object"){
+	            data = JSON.stringify(data, undefined, 4)
+	        }
+
+	        var blob = new Blob([data], {type: 'text/json'}),
+	            e    = document.createEvent('MouseEvents'),
+	            a    = document.createElement('a')
+
+	        a.download = filename
+	        a.href = window.URL.createObjectURL(blob)
+	        a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+	        e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+	        a.dispatchEvent(e)
+	    }
+	})(console)
 		</script>
 
 	</body>
