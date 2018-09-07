@@ -1,0 +1,12 @@
+.hit {
+  color: white;
+  background-color: #107896;
+  border-style: solid;
+  border-color: black;
+  border-width: 0;
+}
+
+.window {
+  color: white;
+  background-color: rgb(5%,5%,5%);
+}
